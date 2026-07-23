@@ -1,0 +1,6 @@
+# Development-only tooling used by `make spec`, `make lint`, and CI.
+# Runtime scripts in the skill remain Python-standard-library-only.
+# Pins must match [dependency-groups].dev in pyproject.toml.
+ruff==0.15.22
+skills-ref==0.1.1
+ty==0.0.62
