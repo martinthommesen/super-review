@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import unittest
@@ -216,6 +217,18 @@ Classification: Arbitrary
         message = vf.canonical_root_error(report, "/srv/other")
         self.assertIsInstance(message, str)
         self.assertIn("does not match", message or "")
+
+    def test_canonical_root_error_rejects_relative_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "nested").mkdir()
+            with contextlib.chdir(temp_dir):
+                for stated in ("nested/..", "./nested/.."):
+                    with self.subTest(stated=stated):
+                        report = rf.build_report(canonical_root=stated)
+                        self.assert_invalid_with(report, "must be an absolute path")
+                        message = vf.canonical_root_error(report, temp_dir)
+                        self.assertIsInstance(message, str)
+                        self.assertIn("must be an absolute path", message or "")
 
     def test_canonical_root_ignores_spoofed_summary_headings(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

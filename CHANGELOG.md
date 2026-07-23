@@ -13,11 +13,12 @@ All notable changes to `super-review` are recorded here.
 ### Fixed
 
 - Prevented fenced examples and protected human annotation blocks from spoofing the canonical repository identity during safe report commits.
+- Rejected relative `Canonical root` metadata before validation or commit so report identity cannot depend on the writer's working directory.
 
 ### Changed
 
 - Added marketplace-qualified explicit invocation forms, used the qualified Codex mention in its starter prompt, and disabled Claude and Copilot model invocation in client-only metadata while retaining portable Agent Skills frontmatter.
-- Documented marketplace installation while preserving the portable direct-skill archive and install path.
+- Documented marketplace installation and limited the portable direct-skill path to Codex or hosts with equivalent explicit-only invocation policy.
 
 ## [1.3.0] — 2026-07-23
 

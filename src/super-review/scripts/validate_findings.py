@@ -1627,6 +1627,10 @@ def _validate_report_metadata(section_one: str) -> list[str]:
             if parsed.tzinfo is None or parsed.utcoffset() is None:
                 errors.append("Executive Summary Review time must include a timezone")
 
+    canonical_root = values.get("Canonical root", "")
+    if canonical_root and not os.path.isabs(canonical_root):
+        errors.append("Executive Summary Canonical root must be an absolute path")
+
     review_mode = values.get("Review mode", "")
     if review_mode and review_mode not in REVIEW_MODES:
         errors.append(f"Executive Summary Review mode is invalid: {review_mode!r}")
@@ -1883,14 +1887,17 @@ def canonical_root_error(
 ) -> str | None:
     """Report why the stated canonical root does not match ``expected_root``.
 
-    Returns ``None`` when the report's ``Canonical root`` resolves to the same
-    location the report is being committed to or verified against. This is the
-    location check that keeps a report generated for one repository from being
-    written into, or accepted as, another repository's ``FINDINGS.md``.
+    Returns ``None`` when the report states an absolute ``Canonical root`` that
+    resolves to the same location the report is being committed to or verified
+    against. This is the location check that keeps a report generated for one
+    repository from being written into, or accepted as, another repository's
+    ``FINDINGS.md``.
     """
     stated = stated_canonical_root(text)
     if not stated:
         return "report is missing the 'Canonical root' metadata value"
+    if not os.path.isabs(stated):
+        return f"stated Canonical root {stated!r} must be an absolute path"
     expected_real = os.path.realpath(os.fspath(expected_root))
     stated_real = os.path.realpath(os.path.expanduser(stated))
     if stated_real != expected_real:

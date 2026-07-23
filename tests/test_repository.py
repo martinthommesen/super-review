@@ -167,6 +167,18 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(prompt.read_bytes()).hexdigest(), expected)
         self.assertEqual(len(prompt.read_text(encoding="utf-8").splitlines()), 3201)
 
+    def test_direct_install_docs_preserve_explicit_invocation(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        direct_install = readme.split("### Direct skill installation", 1)[1].split(
+            "## Usage", 1
+        )[0]
+        self.assertNotIn(".claude/skills", direct_install)
+        self.assertIn("Codex", direct_install)
+        self.assertIn(
+            "Use the marketplace installation for Claude Code and GitHub Copilot CLI",
+            direct_install,
+        )
+
     def test_required_workbench_documents_exist(self) -> None:
         for relative in (
             "AGENTS.md",

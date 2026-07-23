@@ -59,20 +59,19 @@ Invoke the installed plugin explicitly as `$super-review:super-review`.
 
 ### Direct skill installation
 
-The distributable skill is the `src/super-review/` directory. Copy it into the skills directory your host uses:
+The distributable skill is the `src/super-review/` directory. Its bundled Codex policy disables implicit invocation, so it can be installed directly for personal or project use:
 
 ```bash
-# Claude Code — personal (all projects)
-cp -R src/super-review ~/.claude/skills/super-review
+# Codex — personal (all projects)
+cp -R src/super-review ~/.agents/skills/super-review
 
-# Claude Code — project-level
-cp -R src/super-review /path/to/project/.claude/skills/super-review
-
-# Portable project-level layout used by other hosts
+# Codex — project-level
 cp -R src/super-review /path/to/project/.agents/skills/super-review
 ```
 
-Alternatively build the deterministic release archive and extract it into the host's skills directory:
+Use the marketplace installation for Claude Code and GitHub Copilot CLI; copying only the portable skill would omit their client-specific manual-invocation control. Other Agent Skills hosts may use the direct archive only when they provide equivalent explicit-only invocation policy.
+
+Build the deterministic release archive and extract it into a compatible host's skills directory:
 
 ```bash
 make build verify   # produces dist/super-review-skill.zip + dist/SHA256SUMS

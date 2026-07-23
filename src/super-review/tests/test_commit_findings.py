@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import tempfile
@@ -243,6 +244,14 @@ class CommitFindingsTests(unittest.TestCase):
             cf.CommitError, "does not belong to this repository"
         ):
             self.commit()
+        self.assertFalse((self.repo / "FINDINGS.md").exists())
+
+    def test_relative_canonical_root_is_rejected_from_destination_cwd(self) -> None:
+        (self.repo / "nested").mkdir()
+        self.write_candidate(rf.build_report(canonical_root="./nested/.."))
+        with contextlib.chdir(self.repo):
+            with self.assertRaisesRegex(cf.CommitError, "must be an absolute path"):
+                self.commit()
         self.assertFalse((self.repo / "FINDINGS.md").exists())
 
     def test_missing_target_creation_detects_concurrent_writer(self) -> None:

@@ -21,7 +21,7 @@ $super-review:super-review [repository path or directory] [optional review mode 
 /super-review:super-review [repository path or directory] [optional review mode and context]
 ```
 
-Use the supplied target. If none is supplied, use the current repository or workspace. Resolve the canonical root from the version-control root when available; otherwise use the supplied directory root.
+Use the supplied target. If none is supplied, use the current repository or workspace. Resolve the canonical root to an absolute path from the version-control root when available; otherwise use the absolute supplied directory root.
 
 ## Trusted skill root
 
