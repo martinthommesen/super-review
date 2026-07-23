@@ -309,6 +309,23 @@ Classification: Arbitrary
                 result.errors,
             )
 
+    def test_validate_path_reports_unresolvable_canonical_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = root / "FINDINGS.md"
+            report.write_bytes(
+                rf.build_report(canonical_root=f"{root}\0suffix").encode("utf-8")
+            )
+            result = vf.validate_path(report, canonical_root=root)
+            self.assertFalse(result.ok)
+            self.assertTrue(
+                any("NUL byte" in error for error in result.errors), result.errors
+            )
+            self.assertTrue(
+                any("cannot be resolved" in error for error in result.errors),
+                result.errors,
+            )
+
     def test_validate_path_accepts_matching_canonical_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

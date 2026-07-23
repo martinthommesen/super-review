@@ -1905,8 +1905,16 @@ def canonical_root_error(
         return "report is missing the 'Canonical root' metadata value"
     if not _is_absolute_canonical_root(stated):
         return f"stated Canonical root {stated!r} must be an absolute path"
-    expected_real = os.path.realpath(os.fspath(expected_root))
-    stated_real = os.path.realpath(os.path.expanduser(stated))
+    try:
+        expected_real = os.path.realpath(os.fspath(expected_root))
+    except (OSError, ValueError) as exc:
+        return (
+            f"review destination {os.fspath(expected_root)!r} cannot be resolved: {exc}"
+        )
+    try:
+        stated_real = os.path.realpath(os.path.expanduser(stated))
+    except (OSError, ValueError) as exc:
+        return f"stated Canonical root {stated!r} cannot be resolved: {exc}"
     if stated_real != expected_real:
         return (
             f"stated Canonical root {stated!r} does not match the review destination "
