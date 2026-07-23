@@ -13,6 +13,7 @@ import argparse
 import errno
 import importlib.util
 import json
+import ntpath
 import os
 import re
 import stat
@@ -1557,6 +1558,13 @@ def _summary_metadata_values(section_lines: list[str]) -> dict[str, str]:
     return values
 
 
+def _is_absolute_canonical_root(value: str) -> bool:
+    if os.name == "nt":
+        drive, _ = ntpath.splitdrive(value)
+        return bool(drive) and ntpath.isabs(value)
+    return os.path.isabs(value)
+
+
 def _validate_report_metadata(section_one: str) -> list[str]:
     errors: list[str] = []
     section_lines = section_one.splitlines()
@@ -1628,7 +1636,7 @@ def _validate_report_metadata(section_one: str) -> list[str]:
                 errors.append("Executive Summary Review time must include a timezone")
 
     canonical_root = values.get("Canonical root", "")
-    if canonical_root and not os.path.isabs(canonical_root):
+    if canonical_root and not _is_absolute_canonical_root(canonical_root):
         errors.append("Executive Summary Canonical root must be an absolute path")
 
     review_mode = values.get("Review mode", "")
@@ -1896,7 +1904,7 @@ def canonical_root_error(
     stated = stated_canonical_root(text)
     if not stated:
         return "report is missing the 'Canonical root' metadata value"
-    if not os.path.isabs(stated):
+    if not _is_absolute_canonical_root(stated):
         return f"stated Canonical root {stated!r} must be an absolute path"
     expected_real = os.path.realpath(os.fspath(expected_root))
     stated_real = os.path.realpath(os.path.expanduser(stated))
