@@ -217,6 +217,40 @@ Classification: Arbitrary
         self.assertIsInstance(message, str)
         self.assertIn("does not match", message or "")
 
+    def test_canonical_root_ignores_spoofed_summary_headings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            actual = base / "actual"
+            spoofed = base / "spoofed"
+            actual.mkdir()
+            spoofed.mkdir()
+            prefixes = {
+                "fenced": (
+                    "```markdown\n"
+                    "# 1. Executive Summary\n"
+                    f"Canonical root: {spoofed}\n"
+                    "```\n\n"
+                ),
+                "protected-human-block": (
+                    '<!-- SUPER-REVIEW:HUMAN-START id="summary-example" -->\n'
+                    "# 1. Executive Summary\n"
+                    f"Canonical root: {spoofed}\n"
+                    '<!-- SUPER-REVIEW:HUMAN-END id="summary-example" -->\n\n'
+                ),
+            }
+            for name, prefix in prefixes.items():
+                with self.subTest(name=name):
+                    report = rf.build_report(canonical_root=str(actual)).replace(
+                        "# 1. Executive Summary",
+                        prefix + "# 1. Executive Summary",
+                        1,
+                    )
+                    validation = vf.validate_text(report)
+                    self.assertTrue(validation.ok, validation.errors)
+                    self.assertEqual(vf.stated_canonical_root(report), str(actual))
+                    self.assertIsNone(vf.canonical_root_error(report, actual))
+                    self.assertIsNotNone(vf.canonical_root_error(report, spoofed))
+
     def test_validate_path_enforces_canonical_root_when_requested(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

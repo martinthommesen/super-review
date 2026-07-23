@@ -71,7 +71,7 @@ class RepositoryTests(unittest.TestCase):
             (
                 ".github/plugin/marketplace.json",
                 "plugin.json",
-                "skills",
+                "commands",
             ),
             (
                 ".agents/plugins/marketplace.json",
@@ -108,10 +108,19 @@ class RepositoryTests(unittest.TestCase):
                 component_paths = [component_paths]
 
             if component_field == "commands":
-                self.assertEqual(component_paths, ["./claude/commands/super-review.md"])
-                command = (plugin_root / component_paths[0]).read_text(encoding="utf-8")
+                self.assertEqual(
+                    component_paths, ["./client-adapters/commands/super-review.md"]
+                )
+                command_path = plugin_root / component_paths[0]
+                command = command_path.read_text(encoding="utf-8")
+                canonical_link = (
+                    command_path.parent / "../../super-review/SKILL.md"
+                ).resolve(strict=True)
+                self.assertEqual(
+                    canonical_link, (SKILL / "SKILL.md").resolve(strict=True)
+                )
                 self.assertIn("disable-model-invocation: true", command)
-                self.assertIn("${CLAUDE_PLUGIN_ROOT}/super-review/SKILL.md", command)
+                self.assertIn("../../super-review/SKILL.md", command)
                 self.assertIn("$ARGUMENTS", command)
             else:
                 self.assertEqual(component_paths, ["./super-review"])

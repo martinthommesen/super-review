@@ -18,11 +18,11 @@ The workbench has two deliberately separate layers.
 
 The repository exposes three client-native marketplace catalogs without duplicating the skill:
 
-- `.claude-plugin/marketplace.json` with `src/.claude-plugin/plugin.json` and a manual-only command adapter for Claude Code;
+- `.claude-plugin/marketplace.json` with `src/.claude-plugin/plugin.json` for Claude Code;
 - `.github/plugin/marketplace.json` with `src/plugin.json` for GitHub Copilot CLI;
 - `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex.
 
-Every catalog resolves `src/` as its plugin root. Copilot and Codex resolve `src/super-review/` directly as their sole skill. Claude's manual-only command adapter loads that same canonical entrypoint through `CLAUDE_PLUGIN_ROOT`, keeping Claude-specific invocation metadata out of the portable Agent Skills frontmatter. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
+Every catalog resolves `src/` as its plugin root. Claude and Copilot share a manual-only command adapter that loads `src/super-review/SKILL.md`, keeping their invocation-control extension out of portable Agent Skills frontmatter. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
 
 ### Repository workbench
 

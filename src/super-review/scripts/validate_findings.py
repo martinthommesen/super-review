@@ -1853,30 +1853,29 @@ def _read_path_no_follow(path: Path) -> tuple[bytes | None, str | None]:
 def stated_canonical_root(text: str) -> str | None:
     """Return the report's stated ``Canonical root`` metadata value, if present.
 
-    Isolates the Executive Summary and reads its metadata through the shared
-    :func:`_summary_metadata_values`, so it cannot drift from structural
-    validation.
+    Isolates the structurally parsed Executive Summary and reads its metadata
+    through :func:`_summary_metadata_values`, so fenced examples and protected
+    human annotations cannot spoof the repository identity.
     """
     lines = text.splitlines()
-    start = next(
-        (
-            i
-            for i, line in enumerate(lines)
-            if line.startswith("# 1. Executive Summary")
-        ),
-        None,
-    )
-    if start is None:
+    fence_ranges, fence_errors = _find_fenced_ranges(lines)
+    if fence_errors:
         return None
-    end = next(
-        (
-            i
-            for i in range(start + 1, len(lines))
-            if lines[i].startswith("# ") and not lines[i].startswith("# 1.")
-        ),
-        len(lines),
+    human_blocks, human_errors = _find_human_blocks(lines, _line_set(fence_ranges))
+    if human_errors:
+        return None
+    structural = _masked_lines(
+        lines,
+        [
+            *fence_ranges,
+            *((block.start_line, block.end_line) for block in human_blocks),
+        ],
     )
-    return _summary_metadata_values(lines[start:end]).get("Canonical root")
+    section_ranges, section_errors = _parse_sections(structural)
+    if section_errors or 1 not in section_ranges:
+        return None
+    start, end = section_ranges[1]
+    return _summary_metadata_values(structural[start - 1 : end]).get("Canonical root")
 
 
 def canonical_root_error(

@@ -46,7 +46,7 @@ def _check_tree() -> None:
         REPO_ROOT / ".github" / "plugin" / "marketplace.json",
         REPO_ROOT / "src" / ".claude-plugin" / "plugin.json",
         REPO_ROOT / "src" / ".codex-plugin" / "plugin.json",
-        REPO_ROOT / "src" / "claude" / "commands" / "super-review.md",
+        REPO_ROOT / "src" / "client-adapters" / "commands" / "super-review.md",
         REPO_ROOT / "src" / "plugin.json",
         SOURCE_ROOT / "SKILL.md",
         SOURCE_ROOT / "agents" / "openai.yaml",
