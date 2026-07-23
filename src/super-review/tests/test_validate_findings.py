@@ -45,7 +45,8 @@ class ValidateFindingsTests(unittest.TestCase):
     def test_duplicate_required_metadata_is_rejected(self) -> None:
         report = rf.build_report().replace(
             f"Canonical root: {rf.DEFAULT_CANONICAL_ROOT}",
-            f"Canonical root: {rf.DEFAULT_CANONICAL_ROOT}\nCanonical root: /tmp/other",
+            f"Canonical root: {rf.DEFAULT_CANONICAL_ROOT}\n"
+            "Canonical root: //other.invalid/super-review/repo",
             1,
         )
         self.assert_invalid_with(report, "must appear exactly once")
@@ -204,8 +205,8 @@ Classification: Arbitrary
             )
 
     def test_stated_canonical_root_reads_summary_metadata(self) -> None:
-        report = rf.build_report(canonical_root="/srv/project")
-        self.assertEqual(vf.stated_canonical_root(report), "/srv/project")
+        report = rf.build_report(canonical_root=rf.DEFAULT_CANONICAL_ROOT)
+        self.assertEqual(vf.stated_canonical_root(report), rf.DEFAULT_CANONICAL_ROOT)
 
     def test_canonical_root_error_accepts_matching_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -213,8 +214,11 @@ Classification: Arbitrary
             self.assertIsNone(vf.canonical_root_error(report, temp_dir))
 
     def test_canonical_root_error_flags_mismatch(self) -> None:
-        report = rf.build_report(canonical_root="/srv/project")
-        message = vf.canonical_root_error(report, "/srv/other")
+        report = rf.build_report(canonical_root="//project.invalid/super-review/repo")
+        with mock.patch.object(vf.os, "name", "nt"):
+            message = vf.canonical_root_error(
+                report, "//other.invalid/super-review/repo"
+            )
         self.assertIsInstance(message, str)
         self.assertIn("does not match", message or "")
 
@@ -291,9 +295,11 @@ Classification: Arbitrary
     def test_validate_path_enforces_canonical_root_when_requested(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
+            other = root / "other"
+            other.mkdir()
             report = root / "FINDINGS.md"
             report.write_text(
-                rf.build_report(canonical_root="/somewhere/else"), encoding="utf-8"
+                rf.build_report(canonical_root=str(other)), encoding="utf-8"
             )
             self.assertTrue(vf.validate_path(report).ok)
             result = vf.validate_path(report, canonical_root=root)
