@@ -39,14 +39,14 @@ class ValidateFindingsTests(unittest.TestCase):
 
     def test_empty_required_metadata_is_rejected(self) -> None:
         report = rf.build_report().replace(
-            "Canonical root: /tmp/repo", "Canonical root:", 1
+            f"Canonical root: {rf.DEFAULT_CANONICAL_ROOT}", "Canonical root:", 1
         )
         self.assert_invalid_with(report, "metadata 'Canonical root' must not be empty")
 
     def test_duplicate_required_metadata_is_rejected(self) -> None:
         report = rf.build_report().replace(
-            "Canonical root: /tmp/repo",
-            "Canonical root: /tmp/repo\nCanonical root: /tmp/other",
+            f"Canonical root: {rf.DEFAULT_CANONICAL_ROOT}",
+            f"Canonical root: {rf.DEFAULT_CANONICAL_ROOT}\nCanonical root: /tmp/other",
             1,
         )
         self.assert_invalid_with(report, "must appear exactly once")
@@ -250,6 +250,9 @@ Classification: Arbitrary
                 with self.subTest(stated=stated):
                     result = vf.validate_text(rf.build_report(canonical_root=stated))
                     self.assertTrue(result.ok, result.errors)
+            for report in (vf.minimal_valid_report(), rf.build_report()):
+                result = vf.validate_text(report)
+                self.assertTrue(result.ok, result.errors)
 
     def test_canonical_root_ignores_spoofed_summary_headings(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

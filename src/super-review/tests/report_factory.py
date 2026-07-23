@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import finding_fingerprint as ff
 import validate_findings as vf
 
+DEFAULT_CANONICAL_ROOT = "//example.invalid/super-review/repo"
+
 
 @dataclass(frozen=True)
 class CanonicalRecord:
@@ -440,7 +442,7 @@ def make_positive(*, record_id: str = "POS-001") -> CanonicalRecord:
 def build_report(
     records: list[CanonicalRecord] | None = None,
     *,
-    canonical_root: str = "/tmp/repo",
+    canonical_root: str = DEFAULT_CANONICAL_ROOT,
 ) -> str:
     records = records or []
     active = {record.record_id: record.fingerprint for record in records}

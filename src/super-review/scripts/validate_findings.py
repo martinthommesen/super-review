@@ -1958,7 +1958,7 @@ def minimal_valid_report() -> str:
     section_bodies = {
         1: "\n".join(
             [
-                "Canonical root: /tmp/repo",
+                "Canonical root: //example.invalid/super-review/repo",
                 "Reviewed branch and revision: main at abc123",
                 "Starting repository state: abc123 clean",
                 "Ending repository state: abc123 clean",

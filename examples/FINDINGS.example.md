@@ -19,7 +19,7 @@
 
 # 1. Executive Summary
 
-Canonical root: /tmp/repo
+Canonical root: //example.invalid/super-review/repo
 Reviewed branch and revision: main at abc123
 Starting repository state: abc123 clean
 Ending repository state: abc123 clean

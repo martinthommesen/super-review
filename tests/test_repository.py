@@ -11,6 +11,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from types import ModuleType
+from unittest import mock
 
 ROOT = Path(__file__).resolve(strict=True).parents[1]
 SKILL = ROOT / "src" / "super-review"
@@ -215,8 +216,15 @@ class RepositoryTests(unittest.TestCase):
         validator = load_module(
             "_workbench_validate_findings", SKILL / "scripts" / "validate_findings.py"
         )
-        result = validator.validate_path(ROOT / "examples" / "FINDINGS.example.md")
+        example = ROOT / "examples" / "FINDINGS.example.md"
+        result = validator.validate_path(example)
         self.assertTrue(result.ok, result.errors)
+        stated_root = validator.stated_canonical_root(
+            example.read_text(encoding="utf-8")
+        )
+        self.assertIsInstance(stated_root, str)
+        with mock.patch.object(validator.os, "name", "nt"):
+            self.assertTrue(validator._is_absolute_canonical_root(stated_root))
 
     def test_builder_is_deterministic_and_source_exact(self) -> None:
         build = load_module("_workbench_build", ROOT / "scripts" / "build.py")
