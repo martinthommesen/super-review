@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import tempfile
@@ -37,8 +38,11 @@ class CommitFindingsTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    def report(self, records=None) -> str:
+        return rf.build_report(records, canonical_root=str(self.repo))
+
     def write_candidate(self, text: str | None = None) -> bytes:
-        data = (text or rf.build_report()).encode("utf-8")
+        data = (text if text is not None else self.report()).encode("utf-8")
         self.candidate.write_bytes(data)
         return data
 
@@ -103,7 +107,7 @@ class CommitFindingsTests(unittest.TestCase):
         target = self.repo / "FINDINGS.md"
         target.write_bytes(current)
         self.write_candidate(
-            rf.build_report().replace(
+            self.report().replace(
                 "Material limitations: None",
                 "Material limitations: Candidate update.",
                 1,
@@ -132,17 +136,15 @@ class CommitFindingsTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), concurrent)
 
     def test_protected_human_block_cannot_be_removed(self) -> None:
-        current = add_global_human_block(rf.build_report()).encode("utf-8")
+        current = add_global_human_block(self.report()).encode("utf-8")
         (self.repo / "FINDINGS.md").write_bytes(current)
-        self.write_candidate(rf.build_report())
+        self.write_candidate(self.report())
         with self.assertRaisesRegex(cf.CommitError, "omits protected human block"):
             self.commit(expected=digest(current))
         self.assertEqual((self.repo / "FINDINGS.md").read_bytes(), current)
 
     def test_protected_human_block_survives_byte_for_byte(self) -> None:
-        current_text = add_global_human_block(
-            rf.build_report(), "  Manual decision.  \n"
-        )
+        current_text = add_global_human_block(self.report(), "  Manual decision.  \n")
         current = current_text.encode("utf-8")
         (self.repo / "FINDINGS.md").write_bytes(current)
         candidate_text = current_text.replace(
@@ -218,13 +220,13 @@ class CommitFindingsTests(unittest.TestCase):
         self.assertFalse((self.repo / "FINDINGS.md").exists())
 
     def test_commits_crlf_candidate_exactly(self) -> None:
-        candidate = rf.build_report().replace("\n", "\r\n").encode("utf-8")
+        candidate = self.report().replace("\n", "\r\n").encode("utf-8")
         self.candidate.write_bytes(candidate)
         self.commit()
         self.assertEqual((self.repo / "FINDINGS.md").read_bytes(), candidate)
 
     def test_hard_link_candidate_to_target_is_rejected(self) -> None:
-        current = rf.build_report().encode("utf-8")
+        current = self.report().encode("utf-8")
         target = self.repo / "FINDINGS.md"
         target.write_bytes(current)
         try:
@@ -233,6 +235,24 @@ class CommitFindingsTests(unittest.TestCase):
             self.skipTest(f"hard links unavailable: {exc}")
         with self.assertRaisesRegex(cf.CommitError, "hard link"):
             self.commit(expected=digest(current))
+
+    def test_candidate_for_another_repository_is_rejected(self) -> None:
+        other = self.base / "other-repo"
+        other.mkdir()
+        self.write_candidate(rf.build_report(canonical_root=str(other)))
+        with self.assertRaisesRegex(
+            cf.CommitError, "does not belong to this repository"
+        ):
+            self.commit()
+        self.assertFalse((self.repo / "FINDINGS.md").exists())
+
+    def test_relative_canonical_root_is_rejected_from_destination_cwd(self) -> None:
+        (self.repo / "nested").mkdir()
+        self.write_candidate(rf.build_report(canonical_root="./nested/.."))
+        with contextlib.chdir(self.repo):
+            with self.assertRaisesRegex(cf.CommitError, "must be an absolute path"):
+                self.commit()
+        self.assertFalse((self.repo / "FINDINGS.md").exists())
 
     def test_missing_target_creation_detects_concurrent_writer(self) -> None:
         self.write_candidate()

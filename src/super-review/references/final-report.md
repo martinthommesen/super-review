@@ -11,7 +11,7 @@ If a section has no evidence-supported content, keep the required heading and st
 Begin with these exact metadata labels and current values:
 
 ```text
-Canonical root: <absolute or workspace-resolved root>
+Canonical root: <absolute canonical root, including any workspace-resolved root>
 Reviewed branch and revision: <branch and revision, or Not available — reason>
 Starting repository state: <revision and worktree/directory fingerprint>
 Ending repository state: <revision and worktree/directory fingerprint>

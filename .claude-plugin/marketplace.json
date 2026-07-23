@@ -1,0 +1,15 @@
+{
+  "name": "super-review",
+  "owner": {
+    "name": "Martin Thommesen"
+  },
+  "description": "Marketplace for the super-review Agent Skill.",
+  "plugins": [
+    {
+      "name": "super-review",
+      "source": "./src",
+      "description": "Exhaustive, evidence-based whole-repository review with explicit invocation.",
+      "version": "1.4.0"
+    }
+  ]
+}

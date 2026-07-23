@@ -2,6 +2,37 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.4.0] — 2026-07-23
+
+### Added
+
+- Repository-backed plugin marketplaces for Claude Code, GitHub Copilot CLI, and Codex.
+- Thin client plugin manifests that all resolve the single canonical `src/super-review/` skill instead of copying it, including a shared manual-only Claude and Copilot command adapter.
+- Regression coverage for marketplace structure, canonical skill targeting, client metadata, and synchronized release versions.
+
+### Fixed
+
+- Prevented fenced examples and protected human annotation blocks from spoofing the canonical repository identity during safe report commits.
+- Rejected relative `Canonical root` metadata before validation or commit so report identity cannot depend on the writer's working directory.
+- Stopped canonical-root validation from dereferencing report-controlled paths, preventing malformed metadata or remote UNC roots from causing validation crashes or network access.
+
+### Changed
+
+- Added marketplace-qualified explicit invocation forms, used the qualified Codex mention in its starter prompt, and disabled Claude and Copilot model invocation in client-only metadata while retaining portable Agent Skills frontmatter.
+- Documented marketplace installation and limited the portable direct-skill path to Codex or hosts with equivalent explicit-only invocation policy.
+- Migration note: reports that recorded a relative `Canonical root` must materialize the same workspace-resolved location as an absolute path before validation or commit; the safe-write lifecycle already required absolute report identity.
+
+## [1.3.0] — 2026-07-23
+
+### Fixed
+
+- Refused to commit a candidate whose stated `Canonical root` resolves to a different repository, closing a lost-report hazard when concurrent reviews collide on a shared candidate path. The safe writer now enforces this before the digest-gated write.
+
+### Added
+
+- A `--canonical-root` option on the report validator that requires the validated file to resolve to `<canonical-root>/FINDINGS.md` and its stated `Canonical root` to name that same repository, used by the post-write verification step.
+- Adversarial regression coverage for the wrong-repository candidate case, a report that lives outside the repository it claims, and the validator's canonical-root cross-check.
+
 ## [1.2.0] — 2026-07-22
 
 ### Fixed

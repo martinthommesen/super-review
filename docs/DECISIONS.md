@@ -47,3 +47,7 @@ The runtime helpers are security-sensitive and may be installed independently of
 ## D12 — Deterministic, side-effect-limited release tooling
 
 Build and verification tools are standard-library-only and write only to explicit output locations. They do not commit, push, publish, deploy, or contact external services. External specification validation is a separate opt-in dependency.
+
+## D13 — One canonical skill behind thin marketplace adapters
+
+Claude Code, GitHub Copilot CLI, and Codex require different marketplace and plugin manifests. Claude and Copilot share a manual-only command adapter that loads `src/super-review/SKILL.md`; their invocation-control frontmatter is not portable under the Agent Skills specification. Codex points directly to the canonical skill and uses `agents/openai.yaml`. No adapter copies or symlinks the skill. Codex direct installs keep their unqualified invocation; Claude and Copilot use their marketplace adapters so manual-only control is not lost. Marketplace namespaces are accepted as explicit invocation without changing review behavior.

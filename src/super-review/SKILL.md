@@ -1,25 +1,27 @@
 ---
 name: super-review
-description: Performs an exhaustive, evidence-based whole-repository engineering, architecture, security, reliability, product, UX, and feature-portfolio review. Use only when the user explicitly invokes $super-review, @super-review, or /super-review for a repository or directory; never auto-select it for a generic review or audit. Every run creates or refreshes the canonical root FINDINGS.md and revalidates all prior report content before merging current findings.
+description: Performs an exhaustive, evidence-based whole-repository engineering, architecture, security, reliability, product, UX, and feature-portfolio review. Use only when the user explicitly invokes $super-review, @super-review, /super-review, or a marketplace-qualified super-review command for a repository or directory; never auto-select it for a generic review or audit. Every run creates or refreshes the canonical root FINDINGS.md and revalidates all prior report content before merging current findings.
 ---
 
 # Super Review
 
-Version: 1.2.0
+Version: 1.4.0
 
 Compatibility: Requires filesystem access to the target repository or directory and permission to create or update its root `FINDINGS.md`. Git and code-search tools are recommended. Python 3 is recommended for the bundled fingerprint, report-validation, safe-write, and test scripts.
 
 ## Invocation gate
 
-Run only after an explicit skill mention. Prefer `$super-review` in Codex; accept `@super-review` on mention-based clients and `/super-review` as the requested alias where supported. Do not activate for a generic review, audit, architecture assessment, security review, or codebase analysis.
+Run only after an explicit skill mention. For direct installs, prefer `$super-review` in Codex, accept `@super-review` on mention-based clients, and accept `/super-review` where supported. For marketplace installs, also accept `$super-review:super-review` in Codex and `/super-review:super-review` in Claude Code. Do not activate for a generic review, audit, architecture assessment, security review, or codebase analysis.
 
 ```text
 $super-review [repository path or directory] [optional review mode and context]
 @super-review [repository path or directory] [optional review mode and context]
 /super-review [repository path or directory] [optional review mode and context]
+$super-review:super-review [repository path or directory] [optional review mode and context]
+/super-review:super-review [repository path or directory] [optional review mode and context]
 ```
 
-Use the supplied target. If none is supplied, use the current repository or workspace. Resolve the canonical root from the version-control root when available; otherwise use the supplied directory root.
+Use the supplied target. If none is supplied, use the current repository or workspace. Resolve the canonical root to an absolute path from the version-control root when available; otherwise use the absolute supplied directory root.
 
 ## Trusted skill root
 
@@ -98,8 +100,8 @@ All referenced rules are normative. Progressive loading changes when instruction
 6. Revalidate every prior claim, then perform independent current-repository discovery. The old report never limits coverage.
 7. Canonicalize by root cause or decision basis; compute deterministic fingerprints; preserve active and retired IDs; derive summaries and roadmap from canonical records.
 8. Generate the candidate outside the repository. Run `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>` and fix every error.
-9. Reread the current report immediately before replacement. Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
-10. Reread the committed file, rerun the absolute-path validator, and verify revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
+9. Reread the current report immediately before replacement. Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write that also refuses a candidate whose stated canonical root belongs to a different repository. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
+10. Reread the committed file, rerun the absolute-path validator with `--canonical-root <canonical-root>`, and verify the stated canonical root, revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
 
 ## Review modes and evidence
 

@@ -51,6 +51,7 @@ def _load_sibling(module_name: str, filename: str) -> ModuleType:
 
 _VALIDATOR = _load_sibling("_super_review_validate_findings", "validate_findings.py")
 validate_bytes = _VALIDATOR.validate_bytes
+canonical_root_error = _VALIDATOR.canonical_root_error
 MAX_REPORT_BYTES = _VALIDATOR.MAX_REPORT_BYTES
 
 EXIT_VALIDATION = 2
@@ -410,7 +411,8 @@ def commit(
     lock_timeout: float,
     dry_run: bool,
 ) -> dict[str, str]:
-    root = repo_root.expanduser().resolve(strict=True)
+    requested_root = repo_root.expanduser().absolute()
+    root = requested_root.resolve(strict=True)
     if not root.is_dir():
         raise CommitError(f"repository root is not a directory: {root}")
 
@@ -430,6 +432,17 @@ def commit(
     if not validation.ok:
         detail = "\n".join(f"  - {item}" for item in validation.errors)
         raise CommitError(f"candidate report validation failed:\n{detail}")
+
+    # The candidate must belong to this repository. A report generated for a
+    # different root (for example, two concurrent reviews colliding on a shared
+    # candidate path) is refused rather than written into the wrong FINDINGS.md.
+    location_error = canonical_root_error(
+        candidate_bytes.decode("utf-8"), requested_root
+    )
+    if location_error:
+        raise CommitError(
+            f"candidate does not belong to this repository: {location_error}"
+        )
     candidate_digest = _digest(candidate_bytes)
 
     with AdvisoryLock(root, lock_timeout):

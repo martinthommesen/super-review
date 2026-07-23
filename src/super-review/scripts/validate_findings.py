@@ -20,7 +20,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import ModuleType
 from typing import Iterable
 
@@ -1542,13 +1542,35 @@ def _validate_cross_references(
     return errors
 
 
+def _summary_metadata_values(section_lines: list[str]) -> dict[str, str]:
+    """First-occurrence value for each Executive Summary metadata label.
+
+    This is the single reader of report metadata values, shared by structural
+    validation and by :func:`stated_canonical_root`, so the two never drift.
+    """
+    values: dict[str, str] = {}
+    for line in section_lines:
+        for label in REPORT_METADATA_LABELS:
+            prefix = label + ":"
+            if line.startswith(prefix) and label not in values:
+                values[label] = line[len(prefix) :].strip()
+    return values
+
+
+def _is_absolute_canonical_root(value: str) -> bool:
+    if os.name == "nt":
+        windows_path = PureWindowsPath(value)
+        return bool(windows_path.drive and windows_path.root)
+    return os.path.isabs(value)
+
+
 def _validate_report_metadata(section_one: str) -> list[str]:
     errors: list[str] = []
-    values: dict[str, str] = {}
+    section_lines = section_one.splitlines()
+    values = _summary_metadata_values(section_lines)
     lines_by_label: dict[str, list[int]] = {
         label: [] for label in REPORT_METADATA_LABELS
     }
-    section_lines = section_one.splitlines()
 
     heading_index = next(
         (
@@ -1581,11 +1603,8 @@ def _validate_report_metadata(section_one: str) -> list[str]:
 
     for index, line in enumerate(section_lines, start=1):
         for label in REPORT_METADATA_LABELS:
-            prefix = label + ":"
-            if line.startswith(prefix):
+            if line.startswith(label + ":"):
                 lines_by_label[label].append(index)
-                if label not in values:
-                    values[label] = line[len(prefix) :].strip()
 
     for label in REPORT_METADATA_LABELS:
         count = len(lines_by_label[label])
@@ -1614,6 +1633,10 @@ def _validate_report_metadata(section_one: str) -> list[str]:
         else:
             if parsed.tzinfo is None or parsed.utcoffset() is None:
                 errors.append("Executive Summary Review time must include a timezone")
+
+    canonical_root = values.get("Canonical root", "")
+    if canonical_root and not _is_absolute_canonical_root(canonical_root):
+        errors.append("Executive Summary Canonical root must be an absolute path")
 
     review_mode = values.get("Review mode", "")
     if review_mode and review_mode not in REVIEW_MODES:
@@ -1838,7 +1861,82 @@ def _read_path_no_follow(path: Path) -> tuple[bytes | None, str | None]:
         os.close(fd)
 
 
-def validate_path(path: Path) -> ValidationResult:
+def stated_canonical_root(text: str) -> str | None:
+    """Return the report's stated ``Canonical root`` metadata value, if present.
+
+    Isolates the structurally parsed Executive Summary and reads its metadata
+    through :func:`_summary_metadata_values`, so fenced examples and protected
+    human annotations cannot spoof the repository identity.
+    """
+    lines = text.splitlines()
+    fence_ranges, fence_errors = _find_fenced_ranges(lines)
+    if fence_errors:
+        return None
+    human_blocks, human_errors = _find_human_blocks(lines, _line_set(fence_ranges))
+    if human_errors:
+        return None
+    structural = _masked_lines(
+        lines,
+        [
+            *fence_ranges,
+            *((block.start_line, block.end_line) for block in human_blocks),
+        ],
+    )
+    section_ranges, section_errors = _parse_sections(structural)
+    if section_errors or 1 not in section_ranges:
+        return None
+    start, end = section_ranges[1]
+    return _summary_metadata_values(structural[start - 1 : end]).get("Canonical root")
+
+
+def canonical_root_error(
+    text: str, expected_root: os.PathLike[str] | str
+) -> str | None:
+    """Report why the stated canonical root does not match ``expected_root``.
+
+    Returns ``None`` when the report states an absolute ``Canonical root`` that
+    matches the expected root directly or its trusted resolution. The
+    report-controlled path is normalized lexically but never dereferenced. This
+    keeps a report generated for one repository from being written into, or
+    accepted as, another repository's ``FINDINGS.md`` without allowing metadata
+    to trigger filesystem or network access.
+    """
+    stated = stated_canonical_root(text)
+    if not stated:
+        return "report is missing the 'Canonical root' metadata value"
+    if not _is_absolute_canonical_root(stated):
+        return f"stated Canonical root {stated!r} must be an absolute path"
+    if "\0" in stated:
+        return (
+            f"stated Canonical root {stated!r} cannot be resolved: contains a NUL byte"
+        )
+    try:
+        expected_text = os.fspath(expected_root)
+        expected_absolute = os.path.abspath(os.path.expanduser(expected_text))
+        expected_normalized = os.path.normcase(os.path.normpath(expected_absolute))
+        stated_normalized = os.path.normcase(os.path.normpath(stated))
+    except (OSError, ValueError) as exc:
+        return (
+            f"review destination {os.fspath(expected_root)!r} cannot be resolved: {exc}"
+        )
+    if stated_normalized == expected_normalized:
+        return None
+    try:
+        expected_real = os.path.realpath(expected_absolute)
+    except (OSError, ValueError) as exc:
+        return f"review destination {expected_text!r} cannot be resolved: {exc}"
+    expected_real_normalized = os.path.normcase(os.path.normpath(expected_real))
+    if stated_normalized != expected_real_normalized:
+        return (
+            f"stated Canonical root {stated!r} does not match the review destination "
+            f"{expected_real} (its normalized path is {stated_normalized})"
+        )
+    return None
+
+
+def validate_path(
+    path: Path, canonical_root: os.PathLike[str] | str | None = None
+) -> ValidationResult:
     canonical = path.expanduser()
     if not canonical.is_absolute():
         canonical = Path.cwd() / canonical
@@ -1846,7 +1944,26 @@ def validate_path(path: Path) -> ValidationResult:
     if error:
         return ValidationResult([error], [])
     assert data is not None
-    return validate_bytes(data, source=str(canonical))
+    result = validate_bytes(data, source=str(canonical))
+    if canonical_root is not None:
+        # Tie three things together: the file must physically be
+        # <canonical-root>/FINDINGS.md, and its stated Canonical root must name
+        # that same repository. Checking only the metadata would accept a report
+        # that lives in a different repository but merely claims this one.
+        expected_file = os.path.join(
+            os.path.realpath(os.fspath(canonical_root)), "FINDINGS.md"
+        )
+        actual_file = os.path.realpath(canonical)
+        if actual_file != expected_file:
+            result.errors.append(
+                f"report path {actual_file} is not the canonical {expected_file}"
+            )
+        root_error = canonical_root_error(
+            data.decode("utf-8", errors="replace"), canonical_root
+        )
+        if root_error:
+            result.errors.append(root_error)
+    return result
 
 
 def minimal_valid_report() -> str:
@@ -1859,7 +1976,7 @@ def minimal_valid_report() -> str:
     section_bodies = {
         1: "\n".join(
             [
-                "Canonical root: /tmp/repo",
+                "Canonical root: //example.invalid/super-review/repo",
                 "Reviewed branch and revision: main at abc123",
                 "Starting repository state: abc123 clean",
                 "Ending repository state: abc123 clean",
@@ -1939,6 +2056,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--quiet", action="store_true", help="suppress success output")
     parser.add_argument(
+        "--canonical-root",
+        type=Path,
+        default=None,
+        help="also require the report's stated Canonical root to resolve to this directory",
+    )
+    parser.add_argument(
         "--self-test", action="store_true", help="run built-in smoke tests"
     )
     return parser
@@ -1952,7 +2075,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: path is required unless --self-test is used", file=sys.stderr)
         return 2
 
-    result = validate_path(args.path)
+    result = validate_path(args.path, canonical_root=args.canonical_root)
     if args.json:
         print(
             json.dumps(

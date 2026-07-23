@@ -14,9 +14,19 @@ The workbench has two deliberately separate layers.
 - `tests/`: regression suite that travels with the package so an installed copy can validate itself;
 - `agents/openai.yaml`: client-specific opt-out from implicit invocation where supported.
 
+### Marketplace adapters
+
+The repository exposes three client-native marketplace catalogs without duplicating the skill:
+
+- `.claude-plugin/marketplace.json` with `src/.claude-plugin/plugin.json` for Claude Code;
+- `.github/plugin/marketplace.json` with `src/plugin.json` for GitHub Copilot CLI;
+- `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex.
+
+Every catalog resolves `src/` as its plugin root. Claude and Copilot share a manual-only command adapter that loads `src/super-review/SKILL.md`, keeping their invocation-control extension out of portable Agent Skills frontmatter. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
+
 ### Repository workbench
 
-Root `scripts/`, root `tests/`, docs, CI, and build metadata exist only for maintainers. They do not enter the skill archive.
+Root `scripts/`, root `tests/`, docs, CI, build metadata, marketplace catalogs, and marketplace adapter manifests exist only for maintainers or repository-backed installation. They do not enter the portable direct-skill archive. That archive includes Codex's explicit-only policy and is suitable for other direct-install hosts only when they provide an equivalent invocation gate; Claude and Copilot use the marketplace adapters instead.
 
 ## Instruction loading
 
@@ -65,3 +75,5 @@ The target repository is untrusted. Runtime helpers are invoked from the absolut
 `scripts/build.py` enumerates regular non-symlink files from `src/super-review`, assigns stable ZIP timestamps, preserves intended Unix modes, orders paths lexicographically, compresses deterministically, writes through a temporary file, and atomically replaces the artifact. It then writes a SHA-256 checksum.
 
 `scripts/verify_dist.py` independently compares the ZIP against source, validates paths and modes, performs CRC checks, extracts safely, and reruns shipped tests from the extracted package.
+
+Marketplace clients install from `src/` through their client-specific manifest. The portable ZIP remains a byte-exact archive of only `src/super-review/`; marketplace metadata cannot fork or replace the canonical skill.
