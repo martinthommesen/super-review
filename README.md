@@ -1,187 +1,95 @@
-# Super Review Skill Workbench
+# super-review
 
-This repository is the complete development workspace for the `super-review` Agent Skill. It contains the distributable skill, all bundled helpers and regression tests, deterministic packaging and clean-room verification tools, CI configuration, the original review prompt, design history, and maintainer instructions.
+[![CI](https://github.com/martinthommesen/super-review/actions/workflows/ci.yml/badge.svg)](https://github.com/martinthommesen/super-review/actions/workflows/ci.yml)
 
-The current skill version is **1.2.0**.
-
-## What the skill does
-
-`super-review` performs a strict, evidence-based whole-repository review spanning engineering, architecture, correctness, security, privacy, reliability, performance, data, APIs, testing, operations, product workflows, UX, developer experience, and feature-portfolio decisions.
-
-Every explicit invocation must create or refresh one canonical report:
+`super-review` is an Agent Skill that performs an exhaustive, evidence-based review of an entire repository — engineering, architecture, correctness, security, privacy, reliability, performance, data, APIs, testing, operations, UX, developer experience, and feature-portfolio decisions — and maintains exactly one canonical report:
 
 ```text
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-An existing report is treated as a set of claims to revalidate. Resolved or stale material is removed from active results, surviving findings retain stable identities, protected human annotations survive regeneration, and the final write is digest-gated and atomic.
+It works with Claude Code, Codex, and other hosts that load Agent Skills. The current skill version is **1.2.0**.
 
-## Repository layout
+## Why it is different
 
-```text
-.
-├── AGENTS.md                         Maintainer rules for coding agents
-├── README.md                         Project overview and local workflow
-├── CONTRIBUTING.md                   Change and validation workflow
-├── SECURITY.md                       Security model and disclosure guidance
-├── CHANGELOG.md                      Skill release history
-├── VERSION                           Canonical repository version
-├── Makefile                          Common development commands
-├── pyproject.toml                    Python/tooling metadata
-├── requirements-dev.txt              Optional external spec validator
-├── src/super-review/                 Exact distributable skill root
-│   ├── SKILL.md
-│   ├── agents/openai.yaml
-│   ├── references/
-│   ├── scripts/
-│   └── tests/
-├── scripts/                          Repository build and release tooling
-├── tests/                            Repository-level regression tests
-├── docs/                             Architecture, decisions, history, source prompt
-├── examples/FINDINGS.example.md      Valid report example
-└── dist/                             Generated release ZIP and checksums
-```
+- **One living report, not a stream of one-off reviews.** An existing `FINDINGS.md` is treated as a set of claims to revalidate: resolved or stale material is retired, surviving findings keep stable canonical IDs, and every run merges revalidated prior content with fresh independent discovery.
+- **Evidence over vibes.** Confirmed findings require current repository evidence. Facts, supported inferences, hypotheses, and missing evidence are labeled as such; inapplicable areas are closed with an explicit evidence-based reason, never silently skipped.
+- **Safe by construction.** The reviewed repository is treated as potentially malicious. Repository-defined commands pass a command-safety gate, bundled helpers are resolved only from the trusted skill root (never from the target repo), and the final report write is digest-gated, exact-byte, and atomic — a concurrent edit is detected and merged, never overwritten. Protected human annotations survive regeneration.
+- **Deterministic identities.** Each canonical record gets a reproducible fingerprint, so findings can be tracked, deduplicated, and retired across runs.
+- **Explicit invocation only.** The skill never auto-activates for a generic "review this" request; it runs only when named directly.
 
-`src/super-review/` is the only canonical source for the distributable skill. Never edit `dist/` directly.
+## Review scope
 
-## Prerequisites
+A run walks up to 23 ordered phases, progressively loading only the instructions each phase needs: baseline and safety, repository inventory, product and feature inventory, architecture, end-to-end workflow tracing, correctness, security and privacy, data and migrations, APIs and integrations, concurrency and distributed systems, performance and cost, reliability and operations, frontend/UX/accessibility, testing strategy, dependencies and supply chain, configuration and deployment, maintainability, better-implementation alternatives, feature-portfolio decisions, documentation, stack-specific deep dives (JavaScript/TypeScript, Python, Go, Rust, Java/Kotlin, C#/.NET, C/C++, SQL, mobile), validation and reproduction, and prioritization/roadmap.
 
-- Python 3.11 or newer for the complete workbench.
-- Python 3 for the bundled skill helpers themselves.
-- `make` is convenient but optional.
-- `skills-ref` is optional and only needed for the external specification check.
+See [`examples/FINDINGS.example.md`](examples/FINDINGS.example.md) for a valid report.
 
-The offline check and build path uses only the Python standard library.
+## Installation
 
-## Start here
-
-Run the complete offline validation pipeline:
+The distributable skill is the `src/super-review/` directory. Copy it into the skills directory your host uses:
 
 ```bash
-python3 scripts/check.py
-```
+# Claude Code — personal (all projects)
+cp -R src/super-review ~/.claude/skills/super-review
 
-or:
+# Claude Code — project-level
+cp -R src/super-review /path/to/project/.claude/skills/super-review
 
-```bash
-make check
-```
-
-That command:
-
-1. checks repository structure, versions, source provenance, file types, permissions, and Python syntax;
-2. runs the repository tests;
-3. runs all bundled skill tests;
-4. runs the report validator self-test;
-5. generates a release ZIP in a temporary directory;
-6. verifies archive safety and exact source parity; and
-7. extracts the ZIP and reruns the bundled tests from the extracted package; and
-8. removes Python bytecode caches created by nested isolated test processes.
-
-## External Agent Skills specification validation
-
-Create a local environment and install the pinned development dependency:
-
-```bash
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-python scripts/spec_validate.py
-```
-
-With `uv`:
-
-```bash
-uv sync --dev
-uv run python scripts/spec_validate.py
-```
-
-This invokes the official `skills-ref` reference validator against `src/super-review`.
-
-## Build and verify a release
-
-```bash
-python3 scripts/build.py
-python3 scripts/verify_dist.py dist/super-review-skill.zip
-```
-
-or:
-
-```bash
-make build verify
-```
-
-The builder creates a deterministic archive containing exactly one top-level `super-review/` directory and writes `dist/SHA256SUMS`. The verifier rejects unsafe paths and symlinks, compares every archived byte with `src/super-review`, checks executable modes, runs ZIP CRC validation, extracts into a temporary directory, and executes the regression suite there.
-
-For the full release gate, including the external specification validator:
-
-```bash
-make release
-```
-
-No script commits, pushes, publishes, deploys, or creates a GitHub release.
-
-## Install the skill locally
-
-Copy or symlink the canonical source directory into the skill directory used by your agent host. A portable project-level layout is:
-
-```bash
-mkdir -p /path/to/project/.agents/skills
+# Portable project-level layout used by other hosts
 cp -R src/super-review /path/to/project/.agents/skills/super-review
 ```
 
-Alternatively, extract `dist/super-review-skill.zip` into the host's configured skills directory.
+Alternatively build the deterministic release archive and extract it into the host's skills directory:
 
-Invoke it explicitly:
+```bash
+make build verify   # produces dist/super-review-skill.zip + dist/SHA256SUMS
+```
+
+## Usage
+
+Invoke the skill explicitly with a target repository or directory (defaults to the current workspace):
 
 ```text
-$super-review /path/to/repository
-@super-review /path/to/repository
-/super-review /path/to/repository
+$super-review /path/to/repository   # preferred Codex form
+@super-review /path/to/repository   # mention-based clients
+/super-review /path/to/repository   # slash-command alias where supported
 ```
 
-`$super-review` is the preferred Codex form; support for aliases depends on the client.
+Optional arguments select a review mode and supply context. The default mode is `REVIEW ONLY`, in which the root `FINDINGS.md` is the sole permitted repository modification — the skill never infers permission for source changes, dependency installation, network access, commits, or any irreversible action.
 
-## Working on the skill
+On completion the skill reports the report path, the reviewed revision, whether the prior report was fully revalidated, the highest-priority active findings, and validation status — the full report lives in `FINDINGS.md`, not the chat.
 
-Read `AGENTS.md` before making changes. The short rule is: preserve strictness and invariants, make the smallest coherent change, update every affected reference/helper/test together, and run `python3 scripts/check.py` before considering the change complete.
+### Requirements
 
-Important coupling points:
+- A host with filesystem access to the target repository and permission to create or update its root `FINDINGS.md`.
+- Python 3 recommended — the bundled helpers are standard-library-only and run in isolated mode (`python3 -I`).
+- Git and code-search tools recommended.
 
-- Report-schema changes require matching updates to record references, `validate_findings.py`, fixtures, tests, and examples.
-- Safe-write changes require adversarial regression tests in `test_commit_findings.py`.
-- Invocation changes require updates to `SKILL.md`, `agents/openai.yaml`, package tests, README, and release notes.
-- Reference restructuring must retain direct `SKILL.md` links and phase-by-phase progressive loading.
-- The original source prompt in `docs/ORIGINAL_REVIEW_PROMPT.md` is archival evidence; do not silently rewrite it.
+## Bundled helpers
 
-See `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and `docs/RELEASE.md` for the detailed model.
+The skill ships three stdlib-only scripts, always resolved from the trusted skill root:
 
-## Runtime helper examples
-
-Validate a generated report:
+- `validate_findings.py` — validates a generated report against the canonical schema (also self-tests).
+- `finding_fingerprint.py` — computes the deterministic canonical-record fingerprint used for finding identity.
+- `commit_findings.py` — the digest-gated, annotation-preserving, atomic report writer.
 
 ```bash
-python3 -I /absolute/path/to/super-review/scripts/validate_findings.py /tmp/FINDINGS.candidate.md
+python3 -I "$SKILL_ROOT/scripts/validate_findings.py" /tmp/FINDINGS.candidate.md
+python3 -I "$SKILL_ROOT/scripts/commit_findings.py" --help
 ```
 
-Compute a deterministic canonical-record fingerprint:
+## This repository
+
+This repo contains the skill plus its development and release workbench: `src/super-review/` is the only canonical source (never edit `dist/`), `scripts/` holds the offline check/build/verify pipeline, `tests/` and `src/super-review/tests/` hold the regression suites, and `docs/` records architecture, decisions, and provenance.
 
 ```bash
-python3 -I /absolute/path/to/super-review/scripts/finding_fingerprint.py \
-  --record-type 'Defect or risk' \
-  --category SEC \
-  --primary-component 'auth/session' \
-  --identity-statement 'session revocation is not enforced at request authorization'
+make check     # full offline gate: structure, versions, tests, clean-room build + byte-parity verify
+make lint      # ruff lint + format check, ty type check
+make release   # clean + check + spec + build + verify
 ```
 
-Inspect the safe writer's interface:
+Contributions: read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md) first — the skill's strictness guarantees are protected by non-negotiable invariants and regression tests. Security model and disclosure: [`SECURITY.md`](SECURITY.md). Release history: [`CHANGELOG.md`](CHANGELOG.md). No repository script commits, pushes, publishes, or deploys.
 
-```bash
-python3 -I /absolute/path/to/super-review/scripts/commit_findings.py --help
-```
+## License
 
-Always resolve these helpers from the trusted loaded skill root, never from the repository under review.
-
-## Licensing
-
-This repository is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
