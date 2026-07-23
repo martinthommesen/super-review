@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SkillPackageTests(unittest.TestCase):
-    def test_frontmatter_is_minimal_and_codex_portable(self) -> None:
+    def test_frontmatter_is_portable_and_explicit_only(self) -> None:
         text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         self.assertFalse(
             text.startswith("\ufeff"), "SKILL.md must not contain a UTF-8 BOM"

@@ -1,0 +1,19 @@
+{
+  "name": "super-review",
+  "version": "1.4.0",
+  "description": "Exhaustive, evidence-based whole-repository review with explicit invocation.",
+  "author": {
+    "name": "Martin Thommesen"
+  },
+  "repository": "https://github.com/martinthommesen/super-review",
+  "license": "Apache-2.0",
+  "keywords": [
+    "architecture",
+    "code-review",
+    "reliability",
+    "security"
+  ],
+  "skills": [
+    "./super-review"
+  ]
+}

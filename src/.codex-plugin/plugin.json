@@ -1,0 +1,32 @@
+{
+  "name": "super-review",
+  "version": "1.4.0",
+  "description": "Exhaustive, evidence-based whole-repository review with explicit invocation.",
+  "author": {
+    "name": "Martin Thommesen"
+  },
+  "repository": "https://github.com/martinthommesen/super-review",
+  "license": "Apache-2.0",
+  "keywords": [
+    "architecture",
+    "code-review",
+    "reliability",
+    "security"
+  ],
+  "skills": "./super-review",
+  "interface": {
+    "displayName": "Super Review",
+    "shortDescription": "Exhaustive repository review with one canonical findings report",
+    "longDescription": "Review a whole repository across engineering, architecture, security, reliability, product, and UX, then maintain one evidence-based canonical FINDINGS.md.",
+    "developerName": "Martin Thommesen",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/martinthommesen/super-review",
+    "defaultPrompt": [
+      "Use Super Review to audit this repository and update its canonical FINDINGS.md."
+    ]
+  }
+}

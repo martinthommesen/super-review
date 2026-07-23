@@ -8,7 +8,7 @@
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-It works with Claude Code, Codex, and other hosts that load Agent Skills. The current skill version is **1.2.0**.
+It works with Claude Code, GitHub Copilot CLI, Codex, and other hosts that load Agent Skills. The current skill version is **1.4.0**.
 
 ## Why it is different
 
@@ -25,6 +25,39 @@ A run walks up to 23 ordered phases, progressively loading only the instructions
 See [`examples/FINDINGS.example.md`](examples/FINDINGS.example.md) for a valid report.
 
 ## Installation
+
+### Marketplace installation
+
+Each marketplace installs the same canonical skill from `src/super-review/`.
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add martinthommesen/super-review
+claude plugin install super-review@super-review
+```
+
+Invoke the installed plugin explicitly as `/super-review:super-review`.
+
+#### GitHub Copilot CLI
+
+```bash
+copilot plugin marketplace add martinthommesen/super-review
+copilot plugin install super-review@super-review
+```
+
+Invoke the installed skill explicitly as `/super-review`.
+
+#### Codex
+
+```bash
+codex plugin marketplace add martinthommesen/super-review
+codex plugin add super-review@super-review
+```
+
+Invoke the installed plugin explicitly as `$super-review:super-review`.
+
+### Direct skill installation
 
 The distributable skill is the `src/super-review/` directory. Copy it into the skills directory your host uses:
 
@@ -50,9 +83,11 @@ make build verify   # produces dist/super-review-skill.zip + dist/SHA256SUMS
 Invoke the skill explicitly with a target repository or directory (defaults to the current workspace):
 
 ```text
-$super-review /path/to/repository   # preferred Codex form
-@super-review /path/to/repository   # mention-based clients
-/super-review /path/to/repository   # slash-command alias where supported
+$super-review /path/to/repository                # direct Codex install
+$super-review:super-review /path/to/repository   # Codex marketplace plugin
+@super-review /path/to/repository                # mention-based clients
+/super-review /path/to/repository                # Copilot or direct slash alias
+/super-review:super-review /path/to/repository   # Claude Code marketplace plugin
 ```
 
 Optional arguments select a review mode and supply context. The default mode is `REVIEW ONLY`, in which the root `FINDINGS.md` is the sole permitted repository modification — the skill never infers permission for source changes, dependency installation, network access, commits, or any irreversible action.

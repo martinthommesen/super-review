@@ -2,6 +2,19 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.4.0] — 2026-07-23
+
+### Added
+
+- Repository-backed plugin marketplaces for Claude Code, GitHub Copilot CLI, and Codex.
+- Thin client plugin manifests that all resolve the single canonical `src/super-review/` skill instead of copying it, including a manual-only Claude command adapter.
+- Regression coverage for marketplace structure, canonical skill targeting, client metadata, and synchronized release versions.
+
+### Changed
+
+- Added marketplace-qualified explicit invocation forms and disabled Claude model invocation in the Claude-only adapter while retaining portable Agent Skills frontmatter.
+- Documented marketplace installation while preserving the portable direct-skill archive and install path.
+
 ## [1.3.0] — 2026-07-23
 
 ### Fixed

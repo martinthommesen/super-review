@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import re
 import stat
 import sys
@@ -31,10 +32,106 @@ class RepositoryTests(unittest.TestCase):
         skill_text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertRegex(version, r"^\d+\.\d+\.\d+$")
         self.assertIn(f"Version: {version}", skill_text)
         self.assertRegex(pyproject, rf'(?m)^version = "{re.escape(version)}"$')
         self.assertIn(f"## [{version}]", changelog)
+        self.assertIn(f"current skill version is **{version}**", readme)
+
+        for relative in (
+            "src/.claude-plugin/plugin.json",
+            "src/.codex-plugin/plugin.json",
+            "src/plugin.json",
+        ):
+            manifest = json.loads((ROOT / relative).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["version"], version, relative)
+
+        for relative in (
+            ".claude-plugin/marketplace.json",
+            ".github/plugin/marketplace.json",
+        ):
+            marketplace = json.loads((ROOT / relative).read_text(encoding="utf-8"))
+            self.assertEqual(marketplace["plugins"][0]["version"], version, relative)
+
+        copilot_marketplace = json.loads(
+            (ROOT / ".github" / "plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(copilot_marketplace["metadata"]["version"], version)
+
+    def test_marketplace_adapters_target_canonical_skill(self) -> None:
+        adapters = (
+            (
+                ".claude-plugin/marketplace.json",
+                ".claude-plugin/plugin.json",
+                "commands",
+            ),
+            (
+                ".github/plugin/marketplace.json",
+                "plugin.json",
+                "skills",
+            ),
+            (
+                ".agents/plugins/marketplace.json",
+                ".codex-plugin/plugin.json",
+                "skills",
+            ),
+        )
+        expected_plugin_root = (ROOT / "src").resolve(strict=True)
+
+        for marketplace_relative, manifest_relative, component_field in adapters:
+            marketplace = json.loads(
+                (ROOT / marketplace_relative).read_text(encoding="utf-8")
+            )
+            self.assertEqual(marketplace["name"], "super-review")
+            self.assertEqual(len(marketplace["plugins"]), 1)
+            entry = marketplace["plugins"][0]
+            self.assertEqual(entry["name"], "super-review")
+
+            source = entry["source"]
+            if isinstance(source, dict):
+                self.assertEqual(source["source"], "local")
+                source_path = source["path"]
+            else:
+                source_path = source
+            self.assertTrue(source_path.startswith("./"))
+            plugin_root = (ROOT / source_path).resolve(strict=True)
+            self.assertEqual(plugin_root, expected_plugin_root)
+
+            manifest_path = plugin_root / manifest_relative
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["name"], "super-review")
+            component_paths = manifest[component_field]
+            if isinstance(component_paths, str):
+                component_paths = [component_paths]
+
+            if component_field == "commands":
+                self.assertEqual(component_paths, ["./claude/commands/super-review.md"])
+                command = (plugin_root / component_paths[0]).read_text(encoding="utf-8")
+                self.assertIn("disable-model-invocation: true", command)
+                self.assertIn("${CLAUDE_PLUGIN_ROOT}/super-review/SKILL.md", command)
+                self.assertIn("$ARGUMENTS", command)
+            else:
+                self.assertEqual(component_paths, ["./super-review"])
+                for skill_path in component_paths:
+                    resolved = (plugin_root / skill_path).resolve(strict=True)
+                    self.assertEqual(resolved, SKILL.resolve(strict=True))
+                    self.assertTrue((resolved / "SKILL.md").is_file())
+
+        codex_marketplace = json.loads(
+            (ROOT / ".agents" / "plugins" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            codex_marketplace["plugins"][0]["policy"],
+            {
+                "installation": "AVAILABLE",
+                "authentication": "ON_INSTALL",
+            },
+        )
 
     def test_original_prompt_provenance(self) -> None:
         prompt = ROOT / "docs" / "ORIGINAL_REVIEW_PROMPT.md"

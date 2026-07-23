@@ -1,22 +1,24 @@
 ---
 name: super-review
-description: Performs an exhaustive, evidence-based whole-repository engineering, architecture, security, reliability, product, UX, and feature-portfolio review. Use only when the user explicitly invokes $super-review, @super-review, or /super-review for a repository or directory; never auto-select it for a generic review or audit. Every run creates or refreshes the canonical root FINDINGS.md and revalidates all prior report content before merging current findings.
+description: Performs an exhaustive, evidence-based whole-repository engineering, architecture, security, reliability, product, UX, and feature-portfolio review. Use only when the user explicitly invokes $super-review, @super-review, /super-review, or a marketplace-qualified super-review command for a repository or directory; never auto-select it for a generic review or audit. Every run creates or refreshes the canonical root FINDINGS.md and revalidates all prior report content before merging current findings.
 ---
 
 # Super Review
 
-Version: 1.3.0
+Version: 1.4.0
 
 Compatibility: Requires filesystem access to the target repository or directory and permission to create or update its root `FINDINGS.md`. Git and code-search tools are recommended. Python 3 is recommended for the bundled fingerprint, report-validation, safe-write, and test scripts.
 
 ## Invocation gate
 
-Run only after an explicit skill mention. Prefer `$super-review` in Codex; accept `@super-review` on mention-based clients and `/super-review` as the requested alias where supported. Do not activate for a generic review, audit, architecture assessment, security review, or codebase analysis.
+Run only after an explicit skill mention. For direct installs, prefer `$super-review` in Codex, accept `@super-review` on mention-based clients, and accept `/super-review` where supported. For marketplace installs, also accept `$super-review:super-review` in Codex and `/super-review:super-review` in Claude Code. Do not activate for a generic review, audit, architecture assessment, security review, or codebase analysis.
 
 ```text
 $super-review [repository path or directory] [optional review mode and context]
 @super-review [repository path or directory] [optional review mode and context]
 /super-review [repository path or directory] [optional review mode and context]
+$super-review:super-review [repository path or directory] [optional review mode and context]
+/super-review:super-review [repository path or directory] [optional review mode and context]
 ```
 
 Use the supplied target. If none is supplied, use the current repository or workspace. Resolve the canonical root from the version-control root when available; otherwise use the supplied directory root.
