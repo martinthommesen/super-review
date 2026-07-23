@@ -16,7 +16,7 @@ All notable changes to `super-review` are recorded here.
 
 ### Changed
 
-- Added marketplace-qualified explicit invocation forms and disabled Claude and Copilot model invocation in client-only metadata while retaining portable Agent Skills frontmatter.
+- Added marketplace-qualified explicit invocation forms, used the qualified Codex mention in its starter prompt, and disabled Claude and Copilot model invocation in client-only metadata while retaining portable Agent Skills frontmatter.
 - Documented marketplace installation while preserving the portable direct-skill archive and install path.
 
 ## [1.3.0] — 2026-07-23

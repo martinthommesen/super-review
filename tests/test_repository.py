@@ -67,21 +67,29 @@ class RepositoryTests(unittest.TestCase):
                 ".claude-plugin/marketplace.json",
                 ".claude-plugin/plugin.json",
                 "commands",
+                ["./client-adapters/commands/super-review.md"],
             ),
             (
                 ".github/plugin/marketplace.json",
                 "plugin.json",
                 "commands",
+                ["./client-adapters/commands"],
             ),
             (
                 ".agents/plugins/marketplace.json",
                 ".codex-plugin/plugin.json",
                 "skills",
+                ["./super-review"],
             ),
         )
         expected_plugin_root = (ROOT / "src").resolve(strict=True)
 
-        for marketplace_relative, manifest_relative, component_field in adapters:
+        for (
+            marketplace_relative,
+            manifest_relative,
+            component_field,
+            expected_component_paths,
+        ) in adapters:
             marketplace = json.loads(
                 (ROOT / marketplace_relative).read_text(encoding="utf-8")
             )
@@ -106,12 +114,12 @@ class RepositoryTests(unittest.TestCase):
             component_paths = manifest[component_field]
             if isinstance(component_paths, str):
                 component_paths = [component_paths]
+            self.assertEqual(component_paths, expected_component_paths)
 
             if component_field == "commands":
-                self.assertEqual(
-                    component_paths, ["./client-adapters/commands/super-review.md"]
-                )
                 command_path = plugin_root / component_paths[0]
+                if command_path.is_dir():
+                    command_path /= "super-review.md"
                 command = command_path.read_text(encoding="utf-8")
                 canonical_link = (
                     command_path.parent / "../../super-review/SKILL.md"
@@ -123,7 +131,6 @@ class RepositoryTests(unittest.TestCase):
                 self.assertIn("../../super-review/SKILL.md", command)
                 self.assertIn("$ARGUMENTS", command)
             else:
-                self.assertEqual(component_paths, ["./super-review"])
                 for skill_path in component_paths:
                     resolved = (plugin_root / skill_path).resolve(strict=True)
                     self.assertEqual(resolved, SKILL.resolve(strict=True))
@@ -140,6 +147,16 @@ class RepositoryTests(unittest.TestCase):
                 "installation": "AVAILABLE",
                 "authentication": "ON_INSTALL",
             },
+        )
+        codex_manifest = json.loads(
+            (ROOT / "src" / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            codex_manifest["interface"]["defaultPrompt"],
+            [
+                "$super-review:super-review audit this repository and update its "
+                "canonical FINDINGS.md."
+            ],
         )
 
     def test_original_prompt_provenance(self) -> None:

@@ -26,7 +26,7 @@
     ],
     "websiteURL": "https://github.com/martinthommesen/super-review",
     "defaultPrompt": [
-      "Use Super Review to audit this repository and update its canonical FINDINGS.md."
+      "$super-review:super-review audit this repository and update its canonical FINDINGS.md."
     ]
   }
 }
