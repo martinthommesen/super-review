@@ -113,7 +113,7 @@ A digest conflict is not a reason to force the write. Reopen and revalidate the 
 After the safe write:
 
 1. Confirm the target is the root `FINDINGS.md`, not a symlink or nested copy.
-2. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <canonical-root>/FINDINGS.md` against the committed file.
+2. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --canonical-root <canonical-root> <canonical-root>/FINDINGS.md` against the committed file. The `--canonical-root` flag confirms the committed file resolves to `<canonical-root>/FINDINGS.md` and that its stated `Canonical root` names that same repository.
 3. Compare the committed digest with the candidate digest.
 4. Reread the beginning, registry, report metadata, top table, every canonical-record section, roadmap, validation section, positive patterns, protected human blocks, and ending.
 5. Reopen every Critical and High finding's primary evidence and a representative sample of other records.

@@ -2,6 +2,17 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.3.0] — 2026-07-23
+
+### Fixed
+
+- Refused to commit a candidate whose stated `Canonical root` resolves to a different repository, closing a lost-report hazard when concurrent reviews collide on a shared candidate path. The safe writer now enforces this before the digest-gated write.
+
+### Added
+
+- A `--canonical-root` option on the report validator that requires the validated file to resolve to `<canonical-root>/FINDINGS.md` and its stated `Canonical root` to name that same repository, used by the post-write verification step.
+- Adversarial regression coverage for the wrong-repository candidate case, a report that lives outside the repository it claims, and the validator's canonical-root cross-check.
+
 ## [1.2.0] — 2026-07-22
 
 ### Fixed

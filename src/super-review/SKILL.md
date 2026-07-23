@@ -5,7 +5,7 @@ description: Performs an exhaustive, evidence-based whole-repository engineering
 
 # Super Review
 
-Version: 1.2.0
+Version: 1.3.0
 
 Compatibility: Requires filesystem access to the target repository or directory and permission to create or update its root `FINDINGS.md`. Git and code-search tools are recommended. Python 3 is recommended for the bundled fingerprint, report-validation, safe-write, and test scripts.
 
@@ -98,8 +98,8 @@ All referenced rules are normative. Progressive loading changes when instruction
 6. Revalidate every prior claim, then perform independent current-repository discovery. The old report never limits coverage.
 7. Canonicalize by root cause or decision basis; compute deterministic fingerprints; preserve active and retired IDs; derive summaries and roadmap from canonical records.
 8. Generate the candidate outside the repository. Run `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>` and fix every error.
-9. Reread the current report immediately before replacement. Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
-10. Reread the committed file, rerun the absolute-path validator, and verify revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
+9. Reread the current report immediately before replacement. Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write that also refuses a candidate whose stated canonical root belongs to a different repository. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
+10. Reread the committed file, rerun the absolute-path validator with `--canonical-root <canonical-root>`, and verify the stated canonical root, revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
 
 ## Review modes and evidence
 

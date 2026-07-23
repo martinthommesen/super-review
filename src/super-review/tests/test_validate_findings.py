@@ -202,6 +202,80 @@ Classification: Arbitrary
                 result.errors,
             )
 
+    def test_stated_canonical_root_reads_summary_metadata(self) -> None:
+        report = rf.build_report(canonical_root="/srv/project")
+        self.assertEqual(vf.stated_canonical_root(report), "/srv/project")
+
+    def test_canonical_root_error_accepts_matching_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = rf.build_report(canonical_root=temp_dir)
+            self.assertIsNone(vf.canonical_root_error(report, temp_dir))
+
+    def test_canonical_root_error_flags_mismatch(self) -> None:
+        report = rf.build_report(canonical_root="/srv/project")
+        message = vf.canonical_root_error(report, "/srv/other")
+        self.assertIsInstance(message, str)
+        self.assertIn("does not match", message or "")
+
+    def test_validate_path_enforces_canonical_root_when_requested(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = root / "FINDINGS.md"
+            report.write_text(
+                rf.build_report(canonical_root="/somewhere/else"), encoding="utf-8"
+            )
+            self.assertTrue(vf.validate_path(report).ok)
+            result = vf.validate_path(report, canonical_root=root)
+            self.assertFalse(result.ok)
+            self.assertTrue(
+                any("does not match" in error for error in result.errors),
+                result.errors,
+            )
+
+    def test_validate_path_accepts_matching_canonical_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = root / "FINDINGS.md"
+            report.write_text(
+                rf.build_report(canonical_root=str(root)), encoding="utf-8"
+            )
+            self.assertTrue(vf.validate_path(report, canonical_root=root).ok)
+
+    def test_validate_path_requires_report_to_live_at_canonical_root(self) -> None:
+        # A report physically in repo B whose metadata (and the --canonical-root
+        # argument) both name repo A must not pass: metadata agreement is not
+        # proof the file lives in that repository.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo_a = base / "repo-a"
+            repo_b = base / "repo-b"
+            repo_a.mkdir()
+            repo_b.mkdir()
+            report = repo_b / "FINDINGS.md"
+            report.write_text(
+                rf.build_report(canonical_root=str(repo_a)), encoding="utf-8"
+            )
+            result = vf.validate_path(report, canonical_root=repo_a)
+            self.assertFalse(result.ok)
+            self.assertTrue(
+                any("is not the canonical" in error for error in result.errors),
+                result.errors,
+            )
+
+    def test_validate_path_rejects_report_outside_named_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            root = base / "repo"
+            other = base / "other"
+            root.mkdir()
+            other.mkdir()
+            report = root / "FINDINGS.md"
+            report.write_text(
+                rf.build_report(canonical_root=str(root)), encoding="utf-8"
+            )
+            result = vf.validate_path(report, canonical_root=other)
+            self.assertFalse(result.ok)
+
 
 if __name__ == "__main__":
     unittest.main()
