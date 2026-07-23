@@ -1895,30 +1895,41 @@ def canonical_root_error(
     """Report why the stated canonical root does not match ``expected_root``.
 
     Returns ``None`` when the report states an absolute ``Canonical root`` that
-    resolves to the same location the report is being committed to or verified
-    against. This is the location check that keeps a report generated for one
-    repository from being written into, or accepted as, another repository's
-    ``FINDINGS.md``.
+    matches the expected root directly or its trusted resolution. The
+    report-controlled path is normalized lexically but never dereferenced. This
+    keeps a report generated for one repository from being written into, or
+    accepted as, another repository's ``FINDINGS.md`` without allowing metadata
+    to trigger filesystem or network access.
     """
     stated = stated_canonical_root(text)
     if not stated:
         return "report is missing the 'Canonical root' metadata value"
     if not _is_absolute_canonical_root(stated):
         return f"stated Canonical root {stated!r} must be an absolute path"
+    if "\0" in stated:
+        return (
+            f"stated Canonical root {stated!r} cannot be resolved: contains a NUL byte"
+        )
     try:
-        expected_real = os.path.realpath(os.fspath(expected_root))
+        expected_text = os.fspath(expected_root)
+        expected_absolute = os.path.abspath(os.path.expanduser(expected_text))
+        expected_normalized = os.path.normcase(os.path.normpath(expected_absolute))
+        stated_normalized = os.path.normcase(os.path.normpath(stated))
     except (OSError, ValueError) as exc:
         return (
             f"review destination {os.fspath(expected_root)!r} cannot be resolved: {exc}"
         )
+    if stated_normalized == expected_normalized:
+        return None
     try:
-        stated_real = os.path.realpath(os.path.expanduser(stated))
+        expected_real = os.path.realpath(expected_absolute)
     except (OSError, ValueError) as exc:
-        return f"stated Canonical root {stated!r} cannot be resolved: {exc}"
-    if stated_real != expected_real:
+        return f"review destination {expected_text!r} cannot be resolved: {exc}"
+    expected_real_normalized = os.path.normcase(os.path.normpath(expected_real))
+    if stated_normalized != expected_real_normalized:
         return (
             f"stated Canonical root {stated!r} does not match the review destination "
-            f"{expected_real} (it resolves to {stated_real})"
+            f"{expected_real} (its normalized path is {stated_normalized})"
         )
     return None
 

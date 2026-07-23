@@ -14,6 +14,7 @@ All notable changes to `super-review` are recorded here.
 
 - Prevented fenced examples and protected human annotation blocks from spoofing the canonical repository identity during safe report commits.
 - Rejected relative `Canonical root` metadata before validation or commit so report identity cannot depend on the writer's working directory.
+- Stopped canonical-root validation from dereferencing report-controlled paths, preventing malformed metadata or remote UNC roots from causing validation crashes or network access.
 
 ### Changed
 

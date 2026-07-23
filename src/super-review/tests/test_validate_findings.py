@@ -222,6 +222,22 @@ Classification: Arbitrary
         self.assertIsInstance(message, str)
         self.assertIn("does not match", message or "")
 
+    def test_canonical_root_mismatch_does_not_resolve_untrusted_path(self) -> None:
+        stated = "//attacker.invalid/share/repo"
+        expected = "//trusted.invalid/share/repo"
+        report = rf.build_report(canonical_root=stated)
+        original_realpath = vf.os.path.realpath
+
+        def guarded_realpath(value):
+            if vf.os.fspath(value) == stated:
+                raise AssertionError("report-controlled path was resolved")
+            return original_realpath(value)
+
+        with mock.patch.object(vf.os.path, "realpath", side_effect=guarded_realpath):
+            message = vf.canonical_root_error(report, expected)
+        self.assertIsInstance(message, str)
+        self.assertIn("does not match", message or "")
+
     def test_canonical_root_error_rejects_relative_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             (Path(temp_dir) / "nested").mkdir()
