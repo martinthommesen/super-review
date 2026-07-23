@@ -13,7 +13,6 @@ import argparse
 import errno
 import importlib.util
 import json
-import ntpath
 import os
 import re
 import stat
@@ -21,7 +20,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import ModuleType
 from typing import Iterable
 
@@ -1560,8 +1559,8 @@ def _summary_metadata_values(section_lines: list[str]) -> dict[str, str]:
 
 def _is_absolute_canonical_root(value: str) -> bool:
     if os.name == "nt":
-        drive, _ = ntpath.splitdrive(value)
-        return bool(drive) and ntpath.isabs(value)
+        windows_path = PureWindowsPath(value)
+        return bool(windows_path.drive and windows_path.root)
     return os.path.isabs(value)
 
 

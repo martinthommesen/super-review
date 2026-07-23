@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import ntpath
 import os
 import tempfile
 import unittest
@@ -232,15 +231,16 @@ Classification: Arbitrary
                         self.assertIn("must be an absolute path", message or "")
 
     def test_windows_canonical_root_requires_drive_or_unc_share(self) -> None:
-        legacy_ntpath = mock.Mock(wraps=ntpath)
-        legacy_ntpath.isabs.side_effect = lambda value: (
-            value.startswith("\\") or ntpath.isabs(value)
-        )
-        with (
-            mock.patch.object(vf.os, "name", "nt"),
-            mock.patch.object(vf.os, "path", legacy_ntpath),
-        ):
-            for stated in (r"\repo", r"\nested\..", r"C:repo"):
+        with mock.patch.object(vf.os, "name", "nt"):
+            for stated in (
+                r"\repo",
+                r"\nested\..",
+                r"C:repo",
+                "\\\\",
+                r"\\server",
+                "//",
+                "//server",
+            ):
                 with self.subTest(stated=stated):
                     self.assert_invalid_with(
                         rf.build_report(canonical_root=stated),
