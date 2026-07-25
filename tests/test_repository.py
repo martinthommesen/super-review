@@ -128,7 +128,7 @@ class RepositoryTests(unittest.TestCase):
                 self.assertEqual(
                     canonical_link, (SKILL / "SKILL.md").resolve(strict=True)
                 )
-                self.assertIn("disable-model-invocation: true", command)
+                self.assertNotIn("disable-model-invocation", command)
                 self.assertIn("../../super-review/SKILL.md", command)
                 self.assertIn("$ARGUMENTS", command)
             else:

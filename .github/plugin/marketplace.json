@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Marketplace for the super-review Agent Skill.",
-    "version": "1.4.0"
+    "version": "1.4.1"
   },
   "plugins": [
     {
       "name": "super-review",
       "source": "./src",
       "description": "Exhaustive, evidence-based whole-repository review with explicit invocation.",
-      "version": "1.4.0"
+      "version": "1.4.1"
     }
   ]
 }
