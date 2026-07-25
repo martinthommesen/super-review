@@ -8,7 +8,7 @@
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-It works with Claude Code, GitHub Copilot CLI, Codex, and other hosts that load Agent Skills. The current skill version is **1.4.0**.
+It works with Claude Code, GitHub Copilot CLI, Codex, and other hosts that load Agent Skills. The current skill version is **1.4.1**.
 
 ## Why it is different
 
@@ -69,7 +69,7 @@ cp -R src/super-review ~/.agents/skills/super-review
 cp -R src/super-review /path/to/project/.agents/skills/super-review
 ```
 
-Use the marketplace installation for Claude Code and GitHub Copilot CLI; copying only the portable skill would omit their client-specific manual-invocation control. Other Agent Skills hosts may use the direct archive only when they provide equivalent explicit-only invocation policy.
+Use the marketplace installation for Claude Code and GitHub Copilot CLI; copying only the portable skill would omit the command adapter their slash invocation resolves. Other Agent Skills hosts may use the direct archive only when they provide equivalent explicit-only invocation policy.
 
 Build the deterministic release archive and extract it into a compatible host's skills directory:
 

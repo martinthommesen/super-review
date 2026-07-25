@@ -2,6 +2,12 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.4.1] — 2026-07-26
+
+### Fixed
+
+- Removed `disable-model-invocation: true` from the shared Claude and Copilot command adapter. Claude Code routes user-typed slash commands through the model's Skill tool, so the flag rejected every invocation with "cannot be used with Skill tool due to disable-model-invocation"; explicit-only activation remains enforced by the skill description and the `SKILL.md` invocation gate.
+
 ## [1.4.0] — 2026-07-23
 
 ### Added

@@ -22,7 +22,7 @@ The repository exposes three client-native marketplace catalogs without duplicat
 - `.github/plugin/marketplace.json` with `src/plugin.json` for GitHub Copilot CLI;
 - `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex.
 
-Every catalog resolves `src/` as its plugin root. Claude and Copilot share a manual-only command adapter that loads `src/super-review/SKILL.md`, keeping their invocation-control extension out of portable Agent Skills frontmatter. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
+Every catalog resolves `src/` as its plugin root. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`; explicit-only activation is enforced by the skill description and invocation gate rather than client invocation-control frontmatter, which is not portable and blocks the Skill-tool path Claude Code uses even for user-typed commands. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
 
 ### Repository workbench
 
