@@ -9,7 +9,7 @@
       "name": "super-review",
       "source": "./src",
       "description": "Exhaustive, evidence-based whole-repository review with explicit invocation.",
-      "version": "1.4.1"
+      "version": "1.5.0"
     }
   ]
 }

@@ -4,7 +4,9 @@ import hashlib
 import importlib.util
 import json
 import re
+import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -44,6 +46,7 @@ class RepositoryTests(unittest.TestCase):
             "src/.claude-plugin/plugin.json",
             "src/.codex-plugin/plugin.json",
             "src/plugin.json",
+            ".cursor-plugin/plugin.json",
         ):
             manifest = json.loads((ROOT / relative).read_text(encoding="utf-8"))
             self.assertEqual(manifest["version"], version, relative)
@@ -159,6 +162,76 @@ class RepositoryTests(unittest.TestCase):
                 "canonical FINDINGS.md."
             ],
         )
+
+    def test_cursor_plugin_targets_canonical_skill_and_companion(self) -> None:
+        manifest = json.loads(
+            (ROOT / ".cursor-plugin" / "plugin.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["name"], "super-review")
+        skills = manifest["skills"]
+        if isinstance(skills, str):
+            skills = [skills]
+        self.assertEqual(skills, ["./src/super-review"])
+        for skill_path in skills:
+            resolved = (ROOT / skill_path).resolve(strict=True)
+            self.assertEqual(resolved, SKILL.resolve(strict=True))
+            self.assertTrue((resolved / "SKILL.md").is_file())
+
+        commands = manifest["commands"]
+        if isinstance(commands, str):
+            commands = [commands]
+        self.assertEqual(commands, ["./src/client-adapters/cursor/commands"])
+        command_path = ROOT / commands[0] / "super-review.md"
+        command = command_path.read_text(encoding="utf-8")
+        self.assertIn("name: super-review", command)
+        self.assertIn("../../../super-review/SKILL.md", command)
+        self.assertIn("$ARGUMENTS", command)
+        self.assertNotIn("disable-model-invocation", command)
+        canonical_link = (
+            command_path.parent / "../../../super-review/SKILL.md"
+        ).resolve(strict=True)
+        self.assertEqual(canonical_link, (SKILL / "SKILL.md").resolve(strict=True))
+
+        mcp_relative = manifest["mcpServers"]
+        self.assertEqual(mcp_relative, "./src/client-adapters/cursor/mcp.json")
+        mcp = json.loads((ROOT / mcp_relative).read_text(encoding="utf-8"))
+        server = mcp["mcpServers"]["super-review"]
+        self.assertEqual(server["command"], "uv")
+        args = server["args"]
+        self.assertEqual(args[0], "run")
+        self.assertNotIn("-m", args)
+        self.assertNotIn("python3", [server["command"], *args])
+        self.assertIn("${PLUGIN_ROOT}/companion", args)
+        self.assertIn("${PLUGIN_ROOT}/src/super-review", args)
+        self.assertNotIn("--enable-commit", args)
+        self.assertIn("--frozen", args)
+
+    def test_cursor_mcp_launch_command_smoke(self) -> None:
+        """Exercise the exact bundled MCP argv against the installed uv executable."""
+        if shutil.which("uv") is None:
+            self.skipTest("uv executable not on PATH")
+        mcp = json.loads(
+            (ROOT / "src" / "client-adapters" / "cursor" / "mcp.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        server = mcp["mcpServers"]["super-review"]
+        args = [arg.replace("${PLUGIN_ROOT}", str(ROOT)) for arg in server["args"]]
+        completed = subprocess.run(
+            [server["command"], *args, "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
+        )
+        combined = f"{completed.stdout}\n{completed.stderr}"
+        self.assertIn("--skill-root", combined)
+        self.assertIn("--enable-commit", combined)
 
     def test_original_prompt_provenance(self) -> None:
         prompt = ROOT / "docs" / "ORIGINAL_REVIEW_PROMPT.md"

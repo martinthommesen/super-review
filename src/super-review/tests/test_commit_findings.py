@@ -277,6 +277,109 @@ class CommitFindingsTests(unittest.TestCase):
                 self.commit()
         self.assertEqual(target.read_text(encoding="utf-8"), concurrent)
 
+    def test_commit_bytes_writes_exact_payload(self) -> None:
+        payload = self.report().encode("utf-8")
+        result = cf.commit_bytes(
+            repo_root=self.repo,
+            candidate_bytes=payload,
+            expected_digest="MISSING",
+            lock_timeout=1.0,
+            dry_run=False,
+        )
+        self.assertEqual(result["status"], "committed")
+        self.assertEqual((self.repo / "FINDINGS.md").read_bytes(), payload)
+
+    def test_commit_bytes_rejects_non_utf8(self) -> None:
+        with self.assertRaisesRegex(cf.CommitError, "validation failed|UTF-8"):
+            cf.commit_bytes(
+                repo_root=self.repo,
+                candidate_bytes=b"\xff\xfe not utf-8",
+                expected_digest="MISSING",
+                lock_timeout=1.0,
+                dry_run=False,
+            )
+        self.assertFalse((self.repo / "FINDINGS.md").exists())
+
+    def test_commit_bytes_normalizes_expected_digest_via_conflict(self) -> None:
+        current = self.report().encode("utf-8")
+        (self.repo / "FINDINGS.md").write_bytes(current)
+        with self.assertRaises(cf.ConflictError):
+            cf.commit_bytes(
+                repo_root=self.repo,
+                candidate_bytes=current,
+                expected_digest="MISSING",
+                lock_timeout=1.0,
+                dry_run=False,
+            )
+        self.assertEqual((self.repo / "FINDINGS.md").read_bytes(), current)
+
+    def test_commit_bytes_canonical_root_mismatch(self) -> None:
+        other = self.base / "other-repo"
+        other.mkdir()
+        payload = rf.build_report(canonical_root=str(other)).encode("utf-8")
+        with self.assertRaisesRegex(
+            cf.CommitError, "does not belong to this repository"
+        ):
+            cf.commit_bytes(
+                repo_root=self.repo,
+                candidate_bytes=payload,
+                expected_digest="MISSING",
+                lock_timeout=1.0,
+                dry_run=False,
+            )
+
+    def test_commit_bytes_preserves_annotations(self) -> None:
+        current_text = add_global_human_block(self.report(), "Keep me.\n")
+        current = current_text.encode("utf-8")
+        (self.repo / "FINDINGS.md").write_bytes(current)
+        candidate = current_text.replace(
+            "Material limitations: None",
+            "Material limitations: Updated via bytes.",
+            1,
+        ).encode("utf-8")
+        cf.commit_bytes(
+            repo_root=self.repo,
+            candidate_bytes=candidate,
+            expected_digest=digest(current),
+            lock_timeout=1.0,
+            dry_run=False,
+        )
+        committed = (self.repo / "FINDINGS.md").read_bytes()
+        self.assertEqual(committed, candidate)
+        self.assertIn(b"Keep me.\n", committed)
+
+    def test_commit_bytes_oversized_payload_rejected(self) -> None:
+        with mock.patch.object(cf, "MAX_REPORT_BYTES", 64):
+            with self.assertRaisesRegex(cf.CommitError, "byte safety limit"):
+                cf.commit_bytes(
+                    repo_root=self.repo,
+                    candidate_bytes=b"x" * 65,
+                    expected_digest="MISSING",
+                    lock_timeout=1.0,
+                    dry_run=False,
+                )
+
+    def test_hard_linked_target_alone_is_not_refused(self) -> None:
+        """Atomic replace may detach a hard-linked target pathname safely."""
+        current = self.report().encode("utf-8")
+        target = self.repo / "FINDINGS.md"
+        target.write_bytes(current)
+        alias = self.base / "alias-FINDINGS.md"
+        try:
+            alias.hardlink_to(target)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"hard links unavailable: {exc}")
+        candidate = self.report().replace(
+            "Material limitations: None",
+            "Material limitations: Target had an external hard link.",
+            1,
+        )
+        payload = self.write_candidate(candidate)
+        self.commit(expected=digest(current))
+        self.assertEqual(target.read_bytes(), payload)
+        # The alias still holds the previous inode contents after replace.
+        self.assertEqual(alias.read_bytes(), current)
+
 
 if __name__ == "__main__":
     unittest.main()

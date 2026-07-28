@@ -2,6 +2,21 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.5.0] — 2026-07-28
+
+### Added
+
+- Public `validate_findings.snapshot` helper and `--snapshot` CLI mode that return exact on-disk `FINDINGS.md` bytes plus digest, or `MISSING` when absent.
+- `commit_findings.commit_bytes` as the single digest-gated write core; the path CLI reads the candidate once and delegates to it.
+- Optional `companion/` MCP front-end (separate pins, lockfile, and CI job) for fingerprint / validate / snapshot tools, with `commit_findings` gated behind `--enable-commit` for hosts that authorize writes on explicit skill invocation.
+- Cursor plugin packaging (`.cursor-plugin/plugin.json`) that installs the canonical skill, a thin Cursor command adapter, and a **read-only** companion MCP via `${PLUGIN_ROOT}` paths (launches the `uv` executable; no `--enable-commit` because Cursor Auto-run can skip MCP prompts); prefer user-level install (D14).
+- Companion MCP tool-path regression coverage via FastMCP `call_tool`, outbound 1 MiB snapshot content bound with CLI fallback, and `snapshot_findings` / `commit_findings` restricted to an absolute `repo_root`'s `FINDINGS.md`.
+- Decision D14: default to the skill-root CLI; use MCP only with host-attested active-server provenance plus user affirmation; always post-validate commits via the trusted CLI; never treat project-scoped MCP registration or server self-reports as trust roots.
+
+### Changed
+
+- Documented the UTF-8 `content` + `content_sha256` MCP wire contract, 1 MiB companion size bound with CLI fallback, and mandatory CLI post-validation after any MCP commit.
+
 ## [1.4.1] — 2026-07-26
 
 ### Fixed

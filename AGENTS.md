@@ -15,6 +15,7 @@ Maintain `super-review` as a strict, evidence-driven, explicit-invocation Agent 
 - `src/super-review/tests/` tests the shipped package and runtime helpers.
 - Root `scripts/` contains repository-only build, check, and release tooling.
 - Root `tests/` tests repository packaging and maintenance invariants.
+- `companion/` is an optional MCP front-end with its own pins/lock/CI; it is not part of the portable skill ZIP.
 - `dist/` is generated. Never edit it manually.
 - `docs/ORIGINAL_REVIEW_PROMPT.md` is archival source material. Do not rewrite it as part of ordinary refactoring.
 

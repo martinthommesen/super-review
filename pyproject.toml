@@ -1,6 +1,6 @@
 [project]
 name = "super-review-skill-workbench"
-version = "1.4.1"
+version = "1.5.0"
 description = "Development, validation, and deterministic release workbench for the super-review Agent Skill"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
@@ -20,7 +20,7 @@ package = false
 
 [tool.ruff]
 target-version = "py311"
-extend-exclude = ["dist"]
+extend-exclude = ["dist", "companion"]
 
 [tool.ruff.lint]
 extend-select = ["I"]
@@ -30,6 +30,9 @@ python-version = "3.11"
 # Shipped tests import sibling runtime helpers resolved from the skill root at
 # runtime; mirror that resolution for static analysis.
 extra-paths = ["src/super-review/scripts", "src/super-review/tests"]
+
+[tool.ty.src]
+exclude = ["companion/**", "dist/**"]
 
 [tool.coverage.run]
 branch = true

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "super-review": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${PLUGIN_ROOT}/companion",
+        "--frozen",
+        "super-review-companion",
+        "--skill-root",
+        "${PLUGIN_ROOT}/src/super-review"
+      ]
+    }
+  }
+}

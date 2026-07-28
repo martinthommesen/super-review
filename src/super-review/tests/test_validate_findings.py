@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import tempfile
 import unittest
@@ -385,6 +386,71 @@ Classification: Arbitrary
             )
             result = vf.validate_path(report, canonical_root=other)
             self.assertFalse(result.ok)
+
+    def test_snapshot_missing_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "FINDINGS.md"
+            result = vf.snapshot(path)
+            self.assertEqual(result.status, "missing")
+            self.assertEqual(result.digest, "MISSING")
+            self.assertIsNone(result.data)
+            self.assertEqual(result.human_block_ids(), [])
+
+    def test_snapshot_returns_exact_bytes_and_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "FINDINGS.md"
+            text = (
+                rf.build_report()
+                .replace(
+                    "-->\n",
+                    '-->\n<!-- SUPER-REVIEW:HUMAN-START id="global-decisions" -->\n'
+                    "Keep.\n"
+                    '<!-- SUPER-REVIEW:HUMAN-END id="global-decisions" -->\n',
+                    1,
+                )
+                .replace("\n", "\r\n")
+            )
+            data = text.encode("utf-8")
+            path.write_bytes(data)
+            result = vf.snapshot(path)
+            self.assertEqual(result.status, "present")
+            self.assertEqual(result.data, data)
+            self.assertEqual(
+                result.digest,
+                "sha256:" + __import__("hashlib").sha256(data).hexdigest(),
+            )
+            self.assertEqual(result.human_block_ids(), ["global-decisions"])
+
+    def test_snapshot_rejects_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            real = base / "real.md"
+            link = base / "FINDINGS.md"
+            real.write_text(rf.build_report(), encoding="utf-8")
+            try:
+                link.symlink_to(real)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"symlinks unavailable: {exc}")
+            with self.assertRaises(vf.SnapshotError):
+                vf.snapshot(link)
+
+    def test_snapshot_cli_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "FINDINGS.md"
+            data = rf.build_report().encode("utf-8")
+            path.write_bytes(data)
+            stdout = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stdout(stdout):
+                    code = vf.main(["--snapshot", "--json", str(path)])
+                self.assertEqual(code, 0)
+                stdout.seek(0)
+                payload = json.loads(stdout.read())
+            finally:
+                stdout.close()
+            self.assertEqual(payload["status"], "present")
+            self.assertTrue(str(payload["digest"]).startswith("sha256:"))
+            self.assertEqual(payload["content"].encode("utf-8"), data)
 
 
 if __name__ == "__main__":

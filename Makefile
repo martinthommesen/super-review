@@ -1,8 +1,9 @@
 PYTHON ?= python3
 PYTHON_ENV ?= PYTHONDONTWRITEBYTECODE=1
+UV ?= uv
 ARTIFACT ?= dist/super-review-skill.zip
 
-.PHONY: help check test lint fmt coverage coverage-run coverage-clean-pycache spec build verify release clean example
+.PHONY: help check test lint fmt coverage coverage-run coverage-clean-pycache spec build verify release clean example companion-test
 
 help:
 	@printf '%s\n' \
@@ -16,6 +17,7 @@ help:
 	  'make verify   Verify the distributable and run tests from extraction' \
 	  'make release  Clean, check, spec-validate, build, and verify' \
 	  'make example  Regenerate the valid example FINDINGS.md fixture' \
+	  'make companion-test  Sync and test the optional MCP companion' \
 	  'make clean    Remove generated local artifacts'
 
 check:
@@ -26,12 +28,12 @@ test:
 	$(PYTHON_ENV) $(PYTHON) -I -B src/super-review/tests/run_tests.py
 
 lint:
-	uv run ruff check .
-	uv run ruff format --check .
-	uv run ty check
+	$(UV) run ruff check .
+	$(UV) run ruff format --check .
+	$(UV) run ty check
 
 fmt:
-	uv run ruff format .
+	$(UV) run ruff format .
 
 # Coverage intentionally omits python -I so coverage.py can measure the suites;
 # make test / make check keep isolated-mode execution for the threat model.
@@ -64,6 +66,14 @@ release: clean check spec build verify
 
 example:
 	$(PYTHON_ENV) $(PYTHON) scripts/generate_example.py
+
+companion-test:
+	cd companion && \
+	if command -v $(UV) >/dev/null 2>&1; then \
+	  $(UV) sync --frozen && $(UV) run pytest; \
+	else \
+	  $(PYTHON_ENV) $(PYTHON) -m uv sync --frozen && $(PYTHON_ENV) $(PYTHON) -m uv run pytest; \
+	fi
 
 clean:
 	$(PYTHON_ENV) $(PYTHON) scripts/clean.py

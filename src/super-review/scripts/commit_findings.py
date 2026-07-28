@@ -403,32 +403,32 @@ def _fsync_directory(path: Path) -> None:
         os.close(fd)
 
 
-def commit(
+def commit_bytes(
     *,
     repo_root: Path,
-    candidate_path: Path,
+    candidate_bytes: bytes,
     expected_digest: str,
     lock_timeout: float,
     dry_run: bool,
+    source: str = "<bytes>",
+    candidate_stat: os.stat_result | None = None,
 ) -> dict[str, str]:
+    """Validate and commit immutable candidate bytes under digest concurrency.
+
+    This is the single write core. Path-based ``commit()`` reads the candidate
+    once without following its final component, then delegates here. Optional
+    ``candidate_stat`` enables the path-only hard-link-to-target refusal.
+    """
+    if len(candidate_bytes) > MAX_REPORT_BYTES:
+        raise CommitError(f"{source} exceeds {MAX_REPORT_BYTES} byte safety limit")
+
     requested_root = repo_root.expanduser().absolute()
     root = requested_root.resolve(strict=True)
     if not root.is_dir():
         raise CommitError(f"repository root is not a directory: {root}")
 
     target = root / "FINDINGS.md"
-    candidate = _canonical_leaf(candidate_path)
-    if candidate == target:
-        raise CommitError("candidate must be generated outside the target path")
-    if _is_within(candidate, root):
-        raise CommitError("candidate must be outside the repository root")
-
-    # Open once, without following the final component. Validate and commit these
-    # exact bytes even if the path is renamed or replaced afterward.
-    candidate_bytes, candidate_info = _read_regular_bytes_no_follow(
-        candidate, label="candidate"
-    )
-    validation = validate_bytes(candidate_bytes, source=str(candidate))
+    validation = validate_bytes(candidate_bytes, source=source)
     if not validation.ok:
         detail = "\n".join(f"  - {item}" for item in validation.errors)
         raise CommitError(f"candidate report validation failed:\n{detail}")
@@ -447,7 +447,11 @@ def commit(
 
     with AdvisoryLock(root, lock_timeout):
         actual_digest, current_bytes, current_info = _read_target(target)
-        if current_info is not None and _same_identity(candidate_info, current_info):
+        if (
+            candidate_stat is not None
+            and current_info is not None
+            and _same_identity(candidate_stat, current_info)
+        ):
             raise CommitError("candidate must not be the target through a hard link")
         if actual_digest != expected_digest:
             raise ConflictError(
@@ -520,6 +524,43 @@ def commit(
         "committed_sha256": candidate_digest,
         "status": "committed",
     }
+
+
+def commit(
+    *,
+    repo_root: Path,
+    candidate_path: Path,
+    expected_digest: str,
+    lock_timeout: float,
+    dry_run: bool,
+) -> dict[str, str]:
+    """Path front-end: read the candidate once, then delegate to ``commit_bytes``."""
+    requested_root = repo_root.expanduser().absolute()
+    root = requested_root.resolve(strict=True)
+    if not root.is_dir():
+        raise CommitError(f"repository root is not a directory: {root}")
+
+    target = root / "FINDINGS.md"
+    candidate = _canonical_leaf(candidate_path)
+    if candidate == target:
+        raise CommitError("candidate must be generated outside the target path")
+    if _is_within(candidate, root):
+        raise CommitError("candidate must be outside the repository root")
+
+    # Open once, without following the final component. Validate and commit these
+    # exact bytes even if the path is renamed or replaced afterward.
+    candidate_bytes, candidate_info = _read_regular_bytes_no_follow(
+        candidate, label="candidate"
+    )
+    return commit_bytes(
+        repo_root=repo_root,
+        candidate_bytes=candidate_bytes,
+        expected_digest=expected_digest,
+        lock_timeout=lock_timeout,
+        dry_run=dry_run,
+        source=str(candidate),
+        candidate_stat=candidate_info,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
