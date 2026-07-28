@@ -1,5 +1,6 @@
 PYTHON ?= python3
 PYTHON_ENV ?= PYTHONDONTWRITEBYTECODE=1
+UV ?= uv
 ARTIFACT ?= dist/super-review-skill.zip
 
 .PHONY: help check test lint fmt spec build verify release clean example companion-test
@@ -26,12 +27,12 @@ test:
 	$(PYTHON_ENV) $(PYTHON) -I -B src/super-review/tests/run_tests.py
 
 lint:
-	uv run ruff check .
-	uv run ruff format --check .
-	uv run ty check
+	$(UV) run ruff check .
+	$(UV) run ruff format --check .
+	$(UV) run ty check
 
 fmt:
-	uv run ruff format .
+	$(UV) run ruff format .
 
 spec:
 	$(PYTHON_ENV) $(PYTHON) scripts/spec_validate.py
@@ -48,7 +49,7 @@ example:
 	$(PYTHON_ENV) $(PYTHON) scripts/generate_example.py
 
 companion-test:
-	cd companion && python3 -m uv sync --frozen && python3 -m uv run pytest
+	cd companion && $(UV) sync --frozen && $(UV) run pytest
 
 clean:
 	$(PYTHON_ENV) $(PYTHON) scripts/clean.py

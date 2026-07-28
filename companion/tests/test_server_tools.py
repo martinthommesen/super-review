@@ -117,43 +117,61 @@ class CompanionServerTests(unittest.TestCase):
             self.assertFalse(result["ok"])
             self.assertTrue(result["errors"])
 
-    def test_snapshot_tool_missing_present_and_basename_guard(self) -> None:
+    def test_snapshot_tool_missing_present_and_root_guard(self) -> None:
         server = build_server(SKILL_ROOT, enable_commit=False)
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir) / "repo"
             repo.mkdir()
             path = repo / "FINDINGS.md"
-            missing = _call_tool(server, "snapshot_findings", {"path": str(path)})
+            missing = _call_tool(
+                server, "snapshot_findings", {"repo_root": str(repo.resolve())}
+            )
             self.assertTrue(missing["ok"])
             self.assertEqual(missing["status"], "missing")
             self.assertIsNone(missing["content"])
 
-            content = rf.build_report(canonical_root=str(repo))
+            content = rf.build_report(canonical_root=str(repo.resolve()))
             path.write_text(content, encoding="utf-8")
-            present = _call_tool(server, "snapshot_findings", {"path": str(path)})
+            present = _call_tool(
+                server, "snapshot_findings", {"repo_root": str(repo.resolve())}
+            )
             self.assertTrue(present["ok"])
             self.assertEqual(present["status"], "present")
             self.assertEqual(present["content"], content)
+            self.assertEqual(present["path"], str(path.resolve()))
 
-            refused = _call_tool(
+            relative = _call_tool(
                 server,
                 "snapshot_findings",
-                {"path": str(repo / "notes.md")},
+                {"repo_root": "repo"},
             )
-            self.assertFalse(refused["ok"])
-            self.assertIn("FINDINGS.md", refused["error"])
+            self.assertFalse(relative["ok"])
+            self.assertIn("absolute", relative["error"])
+
+            # Passing a file path (even FINDINGS.md) is refused; root must be a dir.
+            as_file = _call_tool(
+                server,
+                "snapshot_findings",
+                {"repo_root": str(path.resolve())},
+            )
+            self.assertFalse(as_file["ok"])
 
     def test_snapshot_tool_omits_oversize_content(self) -> None:
         server = build_server(SKILL_ROOT, enable_commit=False)
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "FINDINGS.md"
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
             # Bypass schema validation: snapshot returns exact bytes without validating.
             path.write_bytes(b"x" * (MCP_MAX_CONTENT_BYTES + 1))
-            result = _call_tool(server, "snapshot_findings", {"path": str(path)})
+            result = _call_tool(
+                server, "snapshot_findings", {"repo_root": str(repo.resolve())}
+            )
             self.assertTrue(result["ok"])
             self.assertEqual(result["size"], MCP_MAX_CONTENT_BYTES + 1)
             self.assertIsNone(result["content"])
             self.assertIn("above the MCP limit", result["note"])
+            self.assertIn("--snapshot --json", result["note"])
 
     def test_commit_tool_round_trip_and_conflict(self) -> None:
         server = build_server(SKILL_ROOT, enable_commit=True)

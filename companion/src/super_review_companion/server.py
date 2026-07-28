@@ -86,19 +86,28 @@ def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
         return payload
 
     @mcp.tool()
-    def snapshot_findings(path: str) -> dict[str, Any]:
-        """Return exact on-disk FINDINGS.md bytes/digest, or MISSING if absent.
+    def snapshot_findings(repo_root: str) -> dict[str, Any]:
+        """Return exact bytes/digest for <repo_root>/FINDINGS.md, or MISSING.
 
+        Accepts only a repository root; the report path is derived as
+        ``<repo_root>/FINDINGS.md`` and cannot point at arbitrary files.
         The digest is advisory. Agents needing prior-report revalidation must use
         the returned content bytes when within the MCP size bound. Larger reports
         require the skill-root CLI snapshot. commit_bytes recomputes starting state.
         """
-        target = Path(path)
-        if target.name != "FINDINGS.md":
+        requested = Path(repo_root).expanduser()
+        if not requested.is_absolute():
             return {
                 "ok": False,
-                "error": "snapshot path basename must be FINDINGS.md",
+                "error": "repo_root must be an absolute path",
             }
+        try:
+            root = requested.resolve(strict=True)
+        except OSError as exc:
+            return {"ok": False, "error": f"cannot resolve repo_root: {exc}"}
+        if not root.is_dir():
+            return {"ok": False, "error": f"repo_root is not a directory: {root}"}
+        target = root / "FINDINGS.md"
         try:
             result = validate_mod.snapshot(target)
         except validate_mod.SnapshotError as exc:
@@ -108,6 +117,7 @@ def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
             "ok": True,
             "status": result.status,
             "digest": result.digest,
+            "path": str(target),
             "size": size,
             "human_block_ids": result.human_block_ids(),
             "content": None,
@@ -126,7 +136,7 @@ def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
             payload["note"] = (
                 f"on-disk report is {size} bytes, above the MCP limit of "
                 f"{MCP_MAX_CONTENT_BYTES}; use the skill-root CLI snapshot "
-                "(`validate_findings.py --snapshot`) for exact bytes"
+                "(`validate_findings.py --snapshot --json`) for exact bytes"
             )
             return payload
         try:

@@ -14,7 +14,7 @@ Optional MCP front-end for the shipped FINDINGS helpers. It does **not** replace
 
 ## Write tool gate (D1)
 
-By default the server exposes only read/validate/fingerprint tools (`fingerprint_finding`, `validate_findings`, `snapshot_findings`). Pass `--enable-commit` **only** on hosts that enforce an authorization/invocation gate tying writes to explicit `$/@/`/`super-review` invocation (or equivalent per-write approval). Without that gate, keep commit on the CLI.
+By default the server exposes only read/validate/fingerprint tools (`fingerprint_finding`, `validate_findings`, `snapshot_findings`). `snapshot_findings` takes an absolute `repo_root` and reads only `<repo_root>/FINDINGS.md`. Pass `--enable-commit` **only** on hosts that enforce an authorization/invocation gate tying writes to explicit `$/@/`/`super-review` invocation (or equivalent per-write approval). Without that gate, keep commit on the CLI.
 
 ## Install
 
