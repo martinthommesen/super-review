@@ -9,7 +9,8 @@
 
 ## Development loop
 
-Optional local hooks (ruff + ty) before commit:
+Optional local hooks (ruff + ty) before commit — after `uv sync --dev` or
+`pip install -r requirements-dev.txt` (includes the pinned `pre-commit`):
 
 ```bash
 pre-commit install   # once per clone
