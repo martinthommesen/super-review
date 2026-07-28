@@ -10,6 +10,11 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Local env files (none are required; see .env.example)
+.env
+.env.*
+!.env.example
+
 # Build output
 dist/*
 !dist/.gitkeep
@@ -21,6 +26,14 @@ dist/*
 Thumbs.db
 *.swp
 *.swo
+
+# Local Cursor hook state (committed project hooks under .cursor/hooks/ are allowed;
+# only generated state/logs are ignored)
+.cursor/hooks/state/
+.cursor/hooks/**/*.log
+
+# Local Claude Code overrides (committed .claude/settings.json keeps shared hooks)
+.claude/settings.local.json
 
 # Local review output
 FINDINGS.md

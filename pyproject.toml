@@ -9,6 +9,8 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+  "coverage==7.15.2",
+  "pre-commit==4.6.1",
   "ruff==0.15.22",
   "skills-ref==0.1.1",
   "ty==0.0.62",
@@ -32,3 +34,16 @@ extra-paths = ["src/super-review/scripts", "src/super-review/tests"]
 
 [tool.ty.src]
 exclude = ["companion/**", "dist/**"]
+
+[tool.coverage.run]
+branch = true
+source = [
+  "scripts",
+  "src/super-review/scripts",
+  "src/super-review/tests",
+  "tests",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

@@ -1,0 +1,23 @@
+# Local validation before commit. Install once: `pre-commit install`
+# Ruff rev must match the dual-pinned ruff version (see tests/test_repository.py).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.22
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty type check
+        entry: ty check
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: companion-check
+        name: companion lint and test
+        entry: make companion-test
+        language: system
+        pass_filenames: false
+        files: ^companion/

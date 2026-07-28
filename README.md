@@ -138,7 +138,7 @@ make lint      # ruff lint + format check, ty type check
 make release   # clean + check + spec + build + verify
 ```
 
-Contributions: read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md) first — the skill's strictness guarantees are protected by non-negotiable invariants and regression tests. Security model and disclosure: [`SECURITY.md`](SECURITY.md). Release history: [`CHANGELOG.md`](CHANGELOG.md). No repository script commits, pushes, publishes, or deploys.
+Contributions: read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md) first — the skill's strictness guarantees are protected by non-negotiable invariants and regression tests. Security model and disclosure: [`SECURITY.md`](SECURITY.md). No runtime environment variables are required; [`.env.example`](.env.example) documents that empty secret surface, and CI runs gitleaks. Release history: [`CHANGELOG.md`](CHANGELOG.md). No repository script commits, pushes, publishes, or deploys.
 
 ## License
 
