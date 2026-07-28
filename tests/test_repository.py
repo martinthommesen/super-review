@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 import zipfile
 from pathlib import Path
@@ -270,16 +271,19 @@ class RepositoryTests(unittest.TestCase):
             self.assertTrue((ROOT / relative).is_file(), relative)
 
     def test_pre_commit_ruff_rev_matches_dev_pin(self) -> None:
-        pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         requirements = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
         pre_commit = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
-        pyproject_match = re.search(r'(?m)^  "ruff==([^"]+)",\s*$', pyproject)
+        ruff_pins = [
+            dep.removeprefix("ruff==")
+            for dep in pyproject.get("dependency-groups", {}).get("dev", [])
+            if isinstance(dep, str) and dep.startswith("ruff==")
+        ]
+        self.assertEqual(len(ruff_pins), 1, ruff_pins)
+        pinned = ruff_pins[0]
         requirements_match = re.search(r"(?m)^ruff==(\S+)\s*$", requirements)
-        self.assertIsNotNone(pyproject_match)
         self.assertIsNotNone(requirements_match)
-        assert pyproject_match is not None
         assert requirements_match is not None
-        pinned = pyproject_match.group(1)
         self.assertEqual(pinned, requirements_match.group(1))
         rev_match = re.search(
             r"(?ms)repo:\s*https://github\.com/astral-sh/ruff-pre-commit\s*\n"

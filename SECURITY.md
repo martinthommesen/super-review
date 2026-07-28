@@ -39,4 +39,4 @@ are listed in `.gitleaksignore`.
 
 ## Supported version
 
-The current development line, 1.2.x, receives fixes in this workbench. Older snapshots are historical and should be upgraded before security evaluation.
+The current development line, 1.5.x, receives fixes in this workbench. Older snapshots are historical and should be upgraded before security evaluation.
