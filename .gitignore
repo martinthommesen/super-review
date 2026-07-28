@@ -32,5 +32,8 @@ Thumbs.db
 .cursor/hooks/state/
 .cursor/hooks/**/*.log
 
+# Local Claude Code overrides (committed .claude/settings.json keeps shared hooks)
+.claude/settings.local.json
+
 # Local review output
 FINDINGS.md
