@@ -10,7 +10,9 @@ and summary/roadmap cross-reference invariants.
 from __future__ import annotations
 
 import argparse
+import base64
 import errno
+import hashlib
 import importlib.util
 import json
 import os
@@ -1934,6 +1936,64 @@ def canonical_root_error(
     return None
 
 
+class SnapshotError(RuntimeError):
+    """Raised when a report path exists but cannot be snapshotted safely."""
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """Exact on-disk FINDINGS.md bytes plus digest, or the MISSING sentinel."""
+
+    status: str
+    digest: str
+    data: bytes | None
+
+    def human_block_ids(self) -> list[str]:
+        """Return protected-block IDs when the payload is well-formed UTF-8 text.
+
+        IDs are a convenience for concurrency bookkeeping. Agents that need
+        protected annotation content must use ``data`` (exact bytes), not this
+        list — ``extract_human_blocks`` reconstructs text with ``\\n`` and is
+        not byte-exact.
+        """
+        if self.data is None:
+            return []
+        try:
+            text = self.data.decode("utf-8")
+        except UnicodeDecodeError:
+            return []
+        try:
+            return sorted(extract_human_blocks(text))
+        except ValueError:
+            return []
+
+
+def snapshot(path: Path) -> Snapshot:
+    """Read ``FINDINGS.md`` exactly once without following its final component.
+
+    Returns ``status="missing"`` and digest ``MISSING`` when the path is absent.
+    Raises ``SnapshotError`` for symlinks, non-regular files, and read failures.
+    The digest is advisory for concurrency; ``commit_bytes`` recomputes starting
+    state and fails safe on conflict.
+    """
+    canonical = path.expanduser()
+    if not canonical.is_absolute():
+        canonical = Path.cwd() / canonical
+    try:
+        os.lstat(canonical)
+    except FileNotFoundError:
+        return Snapshot(status="missing", digest="MISSING", data=None)
+    except OSError as exc:
+        raise SnapshotError(f"cannot inspect {canonical}: {exc}") from exc
+
+    data, error = _read_path_no_follow(canonical)
+    if error:
+        raise SnapshotError(error)
+    assert data is not None
+    digest = f"sha256:{hashlib.sha256(data).hexdigest()}"
+    return Snapshot(status="present", digest=digest, data=data)
+
+
 def validate_path(
     path: Path, canonical_root: os.PathLike[str] | str | None = None
 ) -> ValidationResult:
@@ -2062,9 +2122,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="also require the report's stated Canonical root to resolve to this directory",
     )
     parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="emit an exact-byte snapshot (digest and optional content) instead of validating",
+    )
+    parser.add_argument(
         "--self-test", action="store_true", help="run built-in smoke tests"
     )
     return parser
+
+
+def _snapshot_payload(result: Snapshot) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "status": result.status,
+        "digest": result.digest,
+        "size": 0 if result.data is None else len(result.data),
+        "human_block_ids": result.human_block_ids(),
+    }
+    if result.data is not None:
+        payload["content_base64"] = base64.b64encode(result.data).decode("ascii")
+        payload["content_sha256"] = result.digest
+        try:
+            payload["content"] = result.data.decode("utf-8")
+        except UnicodeDecodeError:
+            payload["content"] = None
+    else:
+        payload["content_base64"] = None
+        payload["content_sha256"] = None
+        payload["content"] = None
+    return payload
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2074,6 +2160,31 @@ def main(argv: list[str] | None = None) -> int:
     if args.path is None:
         print("error: path is required unless --self-test is used", file=sys.stderr)
         return 2
+
+    if args.snapshot:
+        if args.canonical_root is not None:
+            print(
+                "error: --canonical-root cannot be combined with --snapshot",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            result = snapshot(args.path)
+        except SnapshotError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        payload = _snapshot_payload(result)
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            print(f"status: {result.status}")
+            print(f"digest: {result.digest}")
+            print(f"size: {payload['size']}")
+            ids = payload["human_block_ids"]
+            assert isinstance(ids, list)
+            if ids:
+                print("human_block_ids: " + ", ".join(str(item) for item in ids))
+        return 0
 
     result = validate_path(args.path, canonical_root=args.canonical_root)
     if args.json:

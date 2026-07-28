@@ -51,3 +51,18 @@ Build and verification tools are standard-library-only and write only to explici
 ## D13 — One canonical skill behind thin marketplace adapters
 
 Claude Code, GitHub Copilot CLI, and Codex require different marketplace and plugin manifests. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`. The adapter originally set `disable-model-invocation: true`, but Claude Code routes even user-typed slash commands through the model's Skill tool, so the flag made the command impossible to invoke at all; the adapter now relies on the skill description and the `SKILL.md` invocation gate for explicit-only activation. Codex points directly to the canonical skill and uses `agents/openai.yaml`. No adapter copies or symlinks the skill. Codex direct installs keep their unqualified invocation. Marketplace namespaces are accepted as explicit invocation without changing review behavior.
+
+## D14 — Optional MCP companion requires enforceable host trust
+
+An optional companion MCP may front the FINDINGS helpers, but MCP configuration is a weaker trust anchor than `$SKILL_ROOT`. Hosts such as Claude Code resolve duplicate server names with local and project scope above user scope, so a reviewed repository's `.mcp.json` can override a user-scoped companion by name. Agents generally cannot observe that precedence from tool names alone, and a lookalike server can lie about any self-reported skill root or digest.
+
+Therefore:
+
+1. The skill defaults to the skill-root CLI and never prefers MCP merely because tools are visible.
+2. MCP use requires host-attested provenance of the *active resolved* server (scope and executable/endpoint) proving it is not a local/project override, plus explicit user affirmation for the run. If the host cannot attest provenance — or managed policy cannot exclude project/local overrides — use the CLI only.
+3. Server handshake values are not a trust root.
+4. After any MCP commit that claims success, post-validate `<canonical-root>/FINDINGS.md` with the skill-root CLI.
+5. On hosts without a write-authorization gate tied to explicit skill invocation, the companion must not expose `commit_findings`; commit remains CLI-only.
+6. Do not recommend project-scoped companion installation in reviewed repositories.
+
+The companion lives outside the portable skill ZIP under `companion/`, with its own dependency pins and CI job.

@@ -15,6 +15,7 @@ Maintain `super-review` as a strict, evidence-driven, explicit-invocation Agent 
 - `src/super-review/tests/` tests the shipped package and runtime helpers.
 - Root `scripts/` contains repository-only build, check, and release tooling.
 - Root `tests/` tests repository packaging and maintenance invariants.
+- `companion/` is an optional MCP front-end with its own pins/lock/CI; it is not part of the portable skill ZIP.
 - `dist/` is generated. Never edit it manually.
 - `docs/ORIGINAL_REVIEW_PROMPT.md` is archival source material. Do not rewrite it as part of ordinary refactoring.
 
@@ -43,6 +44,7 @@ Do not weaken or remove these without an explicit design decision and matching r
 - Inspect affected instructions, helpers, tests, fixtures, examples, schemas, and release tooling before editing.
 - Reuse current patterns. Do not introduce speculative abstractions or dependencies.
 - Keep shipped runtime helpers dependency-free unless a concrete requirement justifies a reviewed change.
+- The optional MCP companion under `companion/` may depend on the MCP SDK; keep those pins out of root `[dependency-groups].dev` / `requirements-dev.txt`.
 - Preserve public behavior, report compatibility, protected annotations, and stable IDs unless a migration is explicitly designed.
 - Avoid formatting churn and unrelated cleanup.
 - Never weaken a test merely to make it pass.

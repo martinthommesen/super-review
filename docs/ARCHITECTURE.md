@@ -28,6 +28,18 @@ Every catalog resolves `src/` as its plugin root. Claude and Copilot share a thi
 
 Root `scripts/`, root `tests/`, docs, CI, build metadata, marketplace catalogs, and marketplace adapter manifests exist only for maintainers or repository-backed installation. They do not enter the portable direct-skill archive. That archive includes Codex's explicit-only policy and is suitable for other direct-install hosts only when they provide an equivalent invocation gate; Claude and Copilot use the marketplace adapters instead.
 
+### Optional MCP companion
+
+`companion/` is an optional typed front-end over the shipped FINDINGS helpers. It is outside the portable ZIP and every marketplace payload (those still resolve from `src/` only). The companion has its own `pyproject.toml`, lockfile, and CI job so the MCP SDK never enters the stdlib-only skill or root `scripts/` trees. See decision D14: default to the skill-root CLI; use MCP only with host-attested active-server provenance plus user affirmation; always post-validate commits via the CLI; expose `commit_findings` only when the host gates writes to explicit skill invocation.
+
+Helper APIs used by the companion:
+
+- `finding_fingerprint.compute_fingerprint`
+- `validate_findings.validate_bytes` and public `validate_findings.snapshot`
+- `commit_findings.commit_bytes` (path `commit()` reads the candidate once, then delegates here)
+
+MCP validate/commit tools transport UTF-8 text plus `content_sha256` of the encoded bytes, with a 1 MiB companion size bound and CLI fallback above it.
+
 ## Instruction loading
 
 Activation loads only `SKILL.md`. The entrypoint then loads four universal references: mandate, principles, findings lifecycle, and phase applicability. It loads command safety before repository-defined execution, one phase at a time, applicable stack references only for detected technologies, record schemas only for record types that exist, and final-report/quality gates during assembly and completion.
@@ -68,7 +80,7 @@ Summary tables, roadmap items, and cross-references point to canonical IDs inste
 
 The target repository is untrusted. Runtime helpers are invoked from the absolute loaded skill root with isolated Python mode. Sibling modules are loaded by canonical file path after regular-file and no-symlink checks. The reviewed repository's current working directory and import path are not trusted resolution sources.
 
-`commit_findings.py` reads candidate bytes once and never rereads the candidate path after validation. It validates and writes the same immutable byte sequence, while separately detecting candidate and target path mutation.
+`commit_findings.py` exposes a single write core, `commit_bytes`, that validates and writes an immutable byte sequence under digest concurrency and annotation preservation. The path CLI reads the candidate once without following its final component, applies path-only location and hard-link checks, then delegates to `commit_bytes`. `validate_findings.snapshot` provides an exact-byte read of an existing report (or `MISSING`) for prior-report revalidation and concurrency bookkeeping; the snapshot digest is advisory because commit recomputes starting state.
 
 ## Build model
 

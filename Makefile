@@ -2,7 +2,7 @@ PYTHON ?= python3
 PYTHON_ENV ?= PYTHONDONTWRITEBYTECODE=1
 ARTIFACT ?= dist/super-review-skill.zip
 
-.PHONY: help check test lint fmt spec build verify release clean example
+.PHONY: help check test lint fmt spec build verify release clean example companion-test
 
 help:
 	@printf '%s\n' \
@@ -15,6 +15,7 @@ help:
 	  'make verify   Verify the distributable and run tests from extraction' \
 	  'make release  Clean, check, spec-validate, build, and verify' \
 	  'make example  Regenerate the valid example FINDINGS.md fixture' \
+	  'make companion-test  Sync and test the optional MCP companion' \
 	  'make clean    Remove generated local artifacts'
 
 check:
@@ -45,6 +46,9 @@ release: clean check spec build verify
 
 example:
 	$(PYTHON_ENV) $(PYTHON) scripts/generate_example.py
+
+companion-test:
+	cd companion && python3 -m uv sync --frozen && python3 -m uv run pytest
 
 clean:
 	$(PYTHON_ENV) $(PYTHON) scripts/clean.py

@@ -5,7 +5,7 @@ description: Performs an exhaustive, evidence-based whole-repository engineering
 
 # Super Review
 
-Version: 1.4.1
+Version: 1.5.0
 
 Compatibility: Requires filesystem access to the target repository or directory and permission to create or update its root `FINDINGS.md`. Git and code-search tools are recommended. Python 3 is recommended for the bundled fingerprint, report-validation, safe-write, and test scripts.
 
@@ -34,6 +34,20 @@ python3 -I "$SKILL_ROOT/scripts/<helper>.py" ...
 ```
 
 Use the platform-equivalent isolated Python invocation when `python3 -I` is unavailable. Do not substitute a same-named repository script.
+
+## Optional MCP companion
+
+An optional companion MCP may front the FINDINGS helpers. It is never the default trust path.
+
+1. Default every helper invocation to the skill-root CLI above. Do not prefer MCP merely because tools named like `mcp__super-review__*` are visible.
+2. Use companion tools only when **both** hold: (a) the host attests the *active resolved* server's scope and executable/endpoint, proving it is not a local or project-scoped override of the trusted companion; (b) the user has affirmed companion use for this run (chat affirmation or host config the agent is instructed to treat as authoritative). If the host cannot attest provenance, stay on the CLI.
+3. Never trust server self-reports about skill root, digests, or identity for authorization.
+4. Companion `validate_findings` / `commit_findings` inputs are UTF-8 `content` plus `content_sha256` of `content.encode("utf-8")`, with a 1 MiB MCP size bound. Above that bound, use the CLI path commit with an on-disk candidate.
+5. On hosts without a write-authorization gate tied to explicit skill invocation, use only companion read/validate/fingerprint tools (or none); keep `commit_findings` on the CLI.
+6. After any MCP commit that claims success, always post-validate `<canonical-root>/FINDINGS.md` with the skill-root CLI (`validate_findings.py --canonical-root ...`). That CLI pass is mandatory even when commit went through MCP.
+7. Do not install or honor a project-scoped companion registration inside a reviewed repository.
+
+See `companion/README.md` in the workbench for install and launch.
 
 ## Non-negotiable output invariant
 
@@ -99,9 +113,9 @@ All referenced rules are normative. Progressive loading changes when instruction
 5. Checkpoint long-running analysis outside the repository, bound to root, revision, worktree state, and starting report digest; invalidate stale phase results after changes.
 6. Revalidate every prior claim, then perform independent current-repository discovery. The old report never limits coverage.
 7. Canonicalize by root cause or decision basis; compute deterministic fingerprints; preserve active and retired IDs; derive summaries and roadmap from canonical records.
-8. Generate the candidate outside the repository. Run `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>` and fix every error.
-9. Reread the current report immediately before replacement. Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write that also refuses a candidate whose stated canonical root belongs to a different repository. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
-10. Reread the committed file, rerun the absolute-path validator with `--canonical-root <canonical-root>`, and verify the stated canonical root, revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
+8. Generate the candidate outside the repository. Run `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>` and fix every error. When D14 companion use is affirmed and content is within the MCP size bound, `validate_findings` with UTF-8 `content` + `content_sha256` is an allowed front-end to the same validator; the CLI remains the default and the fallback.
+9. Reread the current report immediately before replacement (`validate_findings.py --snapshot` or an affirmed companion `snapshot_findings`). Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write that also refuses a candidate whose stated canonical root belongs to a different repository. An affirmed companion `commit_findings` (host write-gate only) is such a front-end to `commit_bytes`; otherwise keep commit on the CLI. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
+10. Reread the committed file, rerun the absolute-path validator with `--canonical-root <canonical-root>` via the skill-root CLI (mandatory even after an MCP commit), and verify the stated canonical root, revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
 
 ## Review modes and evidence
 

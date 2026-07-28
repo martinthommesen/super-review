@@ -6,6 +6,7 @@ The release process is local and validation-gated. It never commits, pushes, pub
 
 - Update `src/super-review/` and all coupled tests/docs.
 - Update `VERSION`, `pyproject.toml`, the `Version:` line in `SKILL.md`, `CHANGELOG.md`, `README.md`, and every versioned marketplace or plugin manifest together for a release.
+- If the optional MCP companion's install/launch/wire contract changes, update `companion/` docs and its own version in `companion/pyproject.toml`; keep companion runtime pins out of the root workbench dev group.
 - Regenerate `examples/FINDINGS.example.md` after schema or fixture changes.
 - Keep the original source prompt unchanged unless the archival source itself is intentionally being replaced; update its checksum in that exceptional case.
 

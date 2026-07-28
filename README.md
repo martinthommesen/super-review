@@ -8,7 +8,7 @@
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-It works with Claude Code, GitHub Copilot CLI, Codex, and other hosts that load Agent Skills. The current skill version is **1.4.1**.
+It works with Claude Code, GitHub Copilot CLI, Codex, and other hosts that load Agent Skills. The current skill version is **1.5.0**.
 
 ## Why it is different
 
@@ -103,14 +103,18 @@ On completion the skill reports the report path, the reviewed revision, whether 
 
 The skill ships three stdlib-only scripts, always resolved from the trusted skill root:
 
-- `validate_findings.py` — validates a generated report against the canonical schema (also self-tests).
+- `validate_findings.py` — validates a generated report against the canonical schema (also self-tests) and can `--snapshot` exact on-disk bytes/digest.
 - `finding_fingerprint.py` — computes the deterministic canonical-record fingerprint used for finding identity.
-- `commit_findings.py` — the digest-gated, annotation-preserving, atomic report writer.
+- `commit_findings.py` — the digest-gated, annotation-preserving, atomic report writer (`commit_bytes` core with a path CLI front-end).
 
 ```bash
 python3 -I "$SKILL_ROOT/scripts/validate_findings.py" /tmp/FINDINGS.candidate.md
 python3 -I "$SKILL_ROOT/scripts/commit_findings.py" --help
 ```
+
+### Optional MCP companion
+
+`companion/` is an optional typed MCP front-end over those helpers. It is **not** in the portable skill ZIP. Default to the skill-root CLI; use the companion only with host-attested active-server provenance and user affirmation (decision D14), and always post-validate commits via the CLI. See [`companion/README.md`](companion/README.md).
 
 ## This repository
 

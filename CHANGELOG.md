@@ -2,6 +2,19 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.5.0] — 2026-07-28
+
+### Added
+
+- Public `validate_findings.snapshot` helper and `--snapshot` CLI mode that return exact on-disk `FINDINGS.md` bytes plus digest, or `MISSING` when absent.
+- `commit_findings.commit_bytes` as the single digest-gated write core; the path CLI reads the candidate once and delegates to it.
+- Optional `companion/` MCP front-end (separate pins, lockfile, and CI job) for fingerprint / validate / snapshot tools, with `commit_findings` gated behind `--enable-commit` for hosts that authorize writes on explicit skill invocation.
+- Decision D14: default to the skill-root CLI; use MCP only with host-attested active-server provenance plus user affirmation; always post-validate commits via the trusted CLI; never treat project-scoped MCP registration or server self-reports as trust roots.
+
+### Changed
+
+- Documented the UTF-8 `content` + `content_sha256` MCP wire contract, 1 MiB companion size bound with CLI fallback, and mandatory CLI post-validation after any MCP commit.
+
 ## [1.4.1] — 2026-07-26
 
 ### Fixed
