@@ -48,8 +48,8 @@ jobs:
         run: ruff format --check .
       - name: Type check
         run: ty check
-
-  specification:
+      - name: Validate pre-commit config
+        run: pre-commit validate-config
     name: Agent Skills specification
     runs-on: ubuntu-latest
     steps:

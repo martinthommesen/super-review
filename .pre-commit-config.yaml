@@ -4,14 +4,20 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.22
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: local
     hooks:
       - id: ty
         name: ty type check
-        entry: uv run ty check
+        entry: ty check
         language: system
         pass_filenames: false
         types: [python]
+      - id: companion-check
+        name: companion lint and test
+        entry: make companion-test
+        language: system
+        pass_filenames: false
+        files: ^companion/

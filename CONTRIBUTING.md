@@ -9,8 +9,9 @@
 
 ## Development loop
 
-Optional local hooks (ruff + ty) before commit — after `uv sync --dev` or
-`pip install -r requirements-dev.txt` (includes the pinned `pre-commit`):
+Optional local hooks (ruff, ty, and companion-check on `companion/` paths)
+before commit — after `uv sync --dev` or `pip install -r requirements-dev.txt`
+(includes the pinned `pre-commit`):
 
 ```bash
 pre-commit install   # once per clone
@@ -41,6 +42,12 @@ Before declaring the work complete:
 ```bash
 python3 scripts/check.py
 make lint
+```
+
+When `companion/` changed, also run (root check/lint intentionally exclude companion):
+
+```bash
+make companion-test
 ```
 
 With development dependencies installed:
@@ -82,6 +89,7 @@ Treat it as a migration across all consumers. Update the normative references, v
 - [ ] Existing tests were not weakened.
 - [ ] `python3 scripts/check.py` passes.
 - [ ] `make lint` passes (ruff lint, ruff format check, ty type check).
+- [ ] `make companion-test` passes when `companion/` changed.
 - [ ] External spec validation passes, or the missing dependency is reported.
 - [ ] Version and changelog are updated when behavior is user-visible.
 - [ ] Generated `dist/` content was produced by the builder, not edited manually.

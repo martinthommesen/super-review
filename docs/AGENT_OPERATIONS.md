@@ -46,6 +46,8 @@ When `companion/` changed, also run:
 make companion-test
 ```
 
+Root `python3 scripts/check.py` and `make lint` intentionally exclude `companion/`; do not treat them as a full-repository green signal when companion files change.
+
 When `skills-ref` is installed, also run:
 
 ```bash

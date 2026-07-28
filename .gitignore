@@ -27,8 +27,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local Cursor hook state (project rules/skills under .cursor/ are committed)
-.cursor/hooks/
+# Local Cursor hook state (committed project hooks under .cursor/hooks/ are allowed;
+# only generated state/logs are ignored)
+.cursor/hooks/state/
+.cursor/hooks/**/*.log
 
 # Local review output
 FINDINGS.md

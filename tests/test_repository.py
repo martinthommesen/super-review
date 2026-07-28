@@ -66,6 +66,12 @@ class RepositoryTests(unittest.TestCase):
         )
         self.assertEqual(copilot_marketplace["metadata"]["version"], version)
 
+        security = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "The current development line named in `VERSION` receives fixes",
+            security,
+        )
+
     def test_marketplace_adapters_target_canonical_skill(self) -> None:
         adapters = (
             (
@@ -261,6 +267,14 @@ class RepositoryTests(unittest.TestCase):
             "CONTRIBUTING.md",
             "SECURITY.md",
             "CHANGELOG.md",
+            ".pre-commit-config.yaml",
+            ".env.example",
+            ".github/CODEOWNERS",
+            ".claude/agents/workbench-validator.md",
+            ".claude/commands/check.md",
+            ".claude/commands/lint.md",
+            ".cursor/rules/workbench.mdc",
+            ".cursor/skills/workbench-validate/SKILL.md",
             "docs/AGENT_OPERATIONS.md",
             "docs/ARCHITECTURE.md",
             "docs/DECISIONS.md",
@@ -269,6 +283,37 @@ class RepositoryTests(unittest.TestCase):
             "docs/PROVENANCE.md",
         ):
             self.assertTrue((ROOT / relative).is_file(), relative)
+
+    def test_agent_host_integration_files_have_expected_shape(self) -> None:
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("make companion-test", agents)
+        self.assertIn("python3 scripts/check.py", agents)
+        self.assertIn("Do not commit, push, publish, deploy", agents)
+
+        pre_commit = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        self.assertIn("id: ruff-check", pre_commit)
+        self.assertIn("id: companion-check", pre_commit)
+        self.assertRegex(pre_commit, r"(?m)^\s*entry:\s*ty check\s*$")
+        self.assertIn("files: ^companion/", pre_commit)
+
+        for relative in (
+            ".claude/commands/check.md",
+            ".claude/commands/lint.md",
+            ".claude/agents/workbench-validator.md",
+            ".cursor/skills/workbench-validate/SKILL.md",
+        ):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("companion-test", text, relative)
+
+        rule = (ROOT / ".cursor" / "rules" / "workbench.mdc").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("alwaysApply: true", rule)
+        self.assertIn("companion-test", rule)
+
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("$(UV) run coverage", makefile)
+        self.assertNotRegex(makefile, r"(?m)^\t\$\(PYTHON_ENV\) uv run coverage")
 
     def test_pre_commit_ruff_rev_matches_dev_pin(self) -> None:
         pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))

@@ -38,4 +38,10 @@ Do not weaken or remove these without an explicit design decision and matching r
 13. Progressive disclosure changes loading time, not applicable review coverage.
 14. The final report remains evidence-based, uncertainty-aware, migration-conscious, and free of filler.
 
-Change discipline, coupled-change matrix, required validation, and versioning/release rules: [`docs/AGENT_OPERATIONS.md`](docs/AGENT_OPERATIONS.md).
+## Required operations
+
+- Before completion run `python3 scripts/check.py` and `make lint`. When `companion/` changed, also run `make companion-test` (root check/lint intentionally exclude companion).
+- Never weaken a test merely to make it pass. Do not commit, push, publish, deploy, delete data, or modify external systems from repository tooling.
+- Keep `VERSION`, `pyproject.toml`, the `SKILL.md` `Version:` line, and `CHANGELOG.md` synchronized for user-visible changes. Dual-pin root dev tools in `pyproject.toml` and `requirements-dev.txt`.
+
+Coupling matrix and release detail: [`docs/AGENT_OPERATIONS.md`](docs/AGENT_OPERATIONS.md). Copilot include: `@docs/AGENT_OPERATIONS.md`.
