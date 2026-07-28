@@ -8,7 +8,7 @@
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-It works with Claude Code, GitHub Copilot CLI, Codex, and other hosts that load Agent Skills. The current skill version is **1.4.1**.
+It works with Claude Code, GitHub Copilot CLI, Codex, Cursor, and other hosts that load Agent Skills. The current skill version is **1.5.0**.
 
 ## Why it is different
 
@@ -57,6 +57,16 @@ codex plugin add super-review@super-review
 
 Invoke the installed plugin explicitly as `$super-review:super-review`.
 
+#### Cursor
+
+This repository is a Cursor plugin (`.cursor-plugin/plugin.json`). It installs the canonical skill plus the optional FINDINGS companion MCP.
+
+Prefer a **user-level** plugin install so the companion is not registered only through a reviewed repository's project config (decision D14). Install from the Cursor marketplace once published, or add this repository as a local/team marketplace plugin and install `super-review` at user scope.
+
+Requirements on the machine: `python3` and the [`uv`](https://docs.astral.sh/uv/) executable on `PATH` (the plugin MCP entry runs `uv run --directory …/companion`).
+
+Invoke the skill explicitly (for example via the plugin command or by naming `$super-review` / `@super-review` / `/super-review` per the skill gate). The bundled Cursor companion is **read-only** (no `commit_findings`): Cursor Auto-run / Auto-review can invoke allowlisted or classifier-approved MCP tools without a prompt, so per-call MCP approval is not a D14 write gate. Keep commits on the skill-root CLI unless you add a separate host gate that Auto-run cannot bypass.
+
 ### Direct skill installation
 
 The distributable skill is the `src/super-review/` directory. Its bundled Codex policy disables implicit invocation, so it can be installed directly for personal or project use:
@@ -103,14 +113,20 @@ On completion the skill reports the report path, the reviewed revision, whether 
 
 The skill ships three stdlib-only scripts, always resolved from the trusted skill root:
 
-- `validate_findings.py` — validates a generated report against the canonical schema (also self-tests).
+- `validate_findings.py` — validates a generated report against the canonical schema (also self-tests) and can `--snapshot` exact on-disk bytes/digest.
 - `finding_fingerprint.py` — computes the deterministic canonical-record fingerprint used for finding identity.
-- `commit_findings.py` — the digest-gated, annotation-preserving, atomic report writer.
+- `commit_findings.py` — the digest-gated, annotation-preserving, atomic report writer (`commit_bytes` core with a path CLI front-end).
 
 ```bash
 python3 -I "$SKILL_ROOT/scripts/validate_findings.py" /tmp/FINDINGS.candidate.md
 python3 -I "$SKILL_ROOT/scripts/commit_findings.py" --help
 ```
+
+### Optional MCP companion
+
+`companion/` is an optional typed MCP front-end over those helpers. It is **not** in the portable skill ZIP. Default to the skill-root CLI; use the companion only with host-attested active-server provenance and user affirmation (decision D14), and always post-validate commits via the CLI. See [`companion/README.md`](companion/README.md).
+
+Cursor users can install this repository as a Cursor plugin (user user-level) to get the skill and companion together; see [Cursor](#cursor) above.
 
 ## This repository
 

@@ -16,17 +16,30 @@ The workbench has two deliberately separate layers.
 
 ### Marketplace adapters
 
-The repository exposes three client-native marketplace catalogs without duplicating the skill:
+The repository exposes four client-native marketplace/plugin catalogs without duplicating the skill:
 
 - `.claude-plugin/marketplace.json` with `src/.claude-plugin/plugin.json` for Claude Code;
 - `.github/plugin/marketplace.json` with `src/plugin.json` for GitHub Copilot CLI;
-- `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex.
+- `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex;
+- `.cursor-plugin/plugin.json` for Cursor (repo-root single-plugin manifest).
 
-Every catalog resolves `src/` as its plugin root. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`; explicit-only activation is enforced by the skill description and invocation gate rather than client invocation-control frontmatter, which is not portable and blocks the Skill-tool path Claude Code uses even for user-typed commands. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
+Claude, Copilot, and Codex catalogs resolve `src/` as their plugin root. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`; explicit-only activation is enforced by the skill description and invocation gate rather than client invocation-control frontmatter, which is not portable and blocks the Skill-tool path Claude Code uses even for user-typed commands. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Cursor's plugin root is the repository itself: it points `skills` at `./src/super-review`, ships a thin Cursor command under `src/client-adapters/cursor/commands/`, and registers the optional companion MCP from `src/client-adapters/cursor/mcp.json` using `${PLUGIN_ROOT}` so the companion binds to the installed skill copy. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
 
 ### Repository workbench
 
 Root `scripts/`, root `tests/`, docs, CI, build metadata, marketplace catalogs, and marketplace adapter manifests exist only for maintainers or repository-backed installation. They do not enter the portable direct-skill archive. That archive includes Codex's explicit-only policy and is suitable for other direct-install hosts only when they provide an equivalent invocation gate; Claude and Copilot use the marketplace adapters instead.
+
+### Optional MCP companion
+
+`companion/` is an optional typed front-end over the shipped FINDINGS helpers. It is outside the portable ZIP and every marketplace payload (those still resolve from `src/` only). The companion has its own `pyproject.toml`, lockfile, and CI job so the MCP SDK never enters the stdlib-only skill or root `scripts/` trees. See decision D14: default to the skill-root CLI; use MCP only with host-attested active-server provenance plus user affirmation; always post-validate commits via the CLI; expose `commit_findings` only when the host gates writes to explicit skill invocation with a gate Auto-run/allowlist modes cannot skip. The bundled Cursor MCP entry therefore stays read-only.
+
+Helper APIs used by the companion:
+
+- `finding_fingerprint.compute_fingerprint`
+- `validate_findings.validate_bytes` and public `validate_findings.snapshot`
+- `commit_findings.commit_bytes` (path `commit()` reads the candidate once, then delegates here)
+
+MCP validate/commit tools transport UTF-8 text plus `content_sha256` of the encoded bytes, with a 1 MiB companion size bound and CLI fallback above it.
 
 ## Instruction loading
 
@@ -68,7 +81,7 @@ Summary tables, roadmap items, and cross-references point to canonical IDs inste
 
 The target repository is untrusted. Runtime helpers are invoked from the absolute loaded skill root with isolated Python mode. Sibling modules are loaded by canonical file path after regular-file and no-symlink checks. The reviewed repository's current working directory and import path are not trusted resolution sources.
 
-`commit_findings.py` reads candidate bytes once and never rereads the candidate path after validation. It validates and writes the same immutable byte sequence, while separately detecting candidate and target path mutation.
+`commit_findings.py` exposes a single write core, `commit_bytes`, that validates and writes an immutable byte sequence under digest concurrency and annotation preservation. The path CLI reads the candidate once without following its final component, applies path-only location and hard-link checks, then delegates to `commit_bytes`. `validate_findings.snapshot` provides an exact-byte read of an existing report (or `MISSING`) for prior-report revalidation and concurrency bookkeeping; the snapshot digest is advisory because commit recomputes starting state.
 
 ## Build model
 

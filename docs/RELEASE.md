@@ -6,6 +6,7 @@ The release process is local and validation-gated. It never commits, pushes, pub
 
 - Update `src/super-review/` and all coupled tests/docs.
 - Update `VERSION`, `pyproject.toml`, the `Version:` line in `SKILL.md`, `CHANGELOG.md`, `README.md`, and every versioned marketplace or plugin manifest together for a release.
+- If the optional MCP companion's install/launch/wire contract changes, update `companion/` docs and its own version in `companion/pyproject.toml`; keep companion runtime pins out of the root workbench dev group.
 - Regenerate `examples/FINDINGS.example.md` after schema or fixture changes.
 - Keep the original source prompt unchanged unless the archival source itself is intentionally being replaced; update its checksum in that exceptional case.
 
@@ -38,6 +39,8 @@ claude plugin validate src --strict
 ```
 
 Copilot and Codex marketplace smoke tests require their respective clients. Add this repository as a marketplace, install `super-review@super-review`, verify the skill source, and invoke the client-specific explicit command before publishing.
+
+For Cursor, confirm `.cursor-plugin/plugin.json` points at `./src/super-review`, the Cursor command adapter, and `src/client-adapters/cursor/mcp.json`. Prefer a user-level plugin install when smoke-testing the companion MCP.
 
 ## 5. Build the distributable
 
