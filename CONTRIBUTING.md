@@ -9,6 +9,13 @@
 
 ## Development loop
 
+Optional local hooks (ruff + ty) before commit:
+
+```bash
+pre-commit install   # once per clone
+pre-commit run --all-files
+```
+
 Use the narrowest test while iterating:
 
 ```bash

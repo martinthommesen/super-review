@@ -9,6 +9,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+  "coverage==7.15.2",
   "ruff==0.15.22",
   "skills-ref==0.1.1",
   "ty==0.0.62",
@@ -29,3 +30,16 @@ python-version = "3.11"
 # Shipped tests import sibling runtime helpers resolved from the skill root at
 # runtime; mirror that resolution for static analysis.
 extra-paths = ["src/super-review/scripts", "src/super-review/tests"]
+
+[tool.coverage.run]
+branch = true
+source = [
+  "scripts",
+  "src/super-review/scripts",
+  "src/super-review/tests",
+  "tests",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

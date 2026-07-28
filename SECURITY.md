@@ -29,6 +29,14 @@ Use a private disclosure channel controlled by the repository owner. Include:
 
 Do not include live credentials, customer data, production secrets, or unnecessary weaponized exploit details. If no private channel exists, open a minimal public issue requesting a secure contact method without publishing the exploit.
 
+## Secret hygiene
+
+This workbench and the shipped skill require no runtime secrets or environment
+variables. [`.env.example`](.env.example) documents that empty surface; local
+`.env` files are gitignored. CI runs gitleaks on every push and pull request
+(see `.github/workflows/ci.yml`). Known false positives for template placeholders
+are listed in `.gitleaksignore`.
+
 ## Supported version
 
 The current development line, 1.2.x, receives fixes in this workbench. Older snapshots are historical and should be upgraded before security evaluation.

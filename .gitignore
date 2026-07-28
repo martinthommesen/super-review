@@ -10,6 +10,11 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Local env files (none are required; see .env.example)
+.env
+.env.*
+!.env.example
+
 # Build output
 dist/*
 !dist/.gitkeep
@@ -21,6 +26,9 @@ dist/*
 Thumbs.db
 *.swp
 *.swo
+
+# Local Cursor hook state (project rules/skills under .cursor/ are committed)
+.cursor/hooks/
 
 # Local review output
 FINDINGS.md

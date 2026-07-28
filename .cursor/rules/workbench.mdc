@@ -1,0 +1,12 @@
+---
+description: Workbench invariants for the super-review skill repository
+alwaysApply: true
+---
+
+# super-review workbench
+
+- Canonical skill source is `src/super-review/` only. Never edit `dist/` or `docs/ORIGINAL_REVIEW_PROMPT.md`.
+- Read `AGENTS.md` (14 invariants) and `docs/AGENT_OPERATIONS.md` (change discipline, coupling, validation, versioning) before substantive edits.
+- Shipped helpers under `src/super-review/scripts/` are stdlib-only and resolve from the skill root, never the target CWD.
+- Before completion: `python3 scripts/check.py` and `make lint`. Do not commit, push, publish, or deploy from tooling.
+- Dev pins must match in `pyproject.toml` `[dependency-groups].dev` and `requirements-dev.txt`.

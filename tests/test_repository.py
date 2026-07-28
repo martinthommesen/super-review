@@ -187,6 +187,7 @@ class RepositoryTests(unittest.TestCase):
             "CONTRIBUTING.md",
             "SECURITY.md",
             "CHANGELOG.md",
+            "docs/AGENT_OPERATIONS.md",
             "docs/ARCHITECTURE.md",
             "docs/DECISIONS.md",
             "docs/RELEASE.md",
@@ -194,6 +195,28 @@ class RepositoryTests(unittest.TestCase):
             "docs/PROVENANCE.md",
         ):
             self.assertTrue((ROOT / relative).is_file(), relative)
+
+    def test_pre_commit_ruff_rev_matches_dev_pin(self) -> None:
+        pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        requirements = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+        pre_commit = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        pyproject_match = re.search(r'(?m)^  "ruff==([^"]+)",\s*$', pyproject)
+        requirements_match = re.search(r"(?m)^ruff==(\S+)\s*$", requirements)
+        self.assertIsNotNone(pyproject_match)
+        self.assertIsNotNone(requirements_match)
+        assert pyproject_match is not None
+        assert requirements_match is not None
+        pinned = pyproject_match.group(1)
+        self.assertEqual(pinned, requirements_match.group(1))
+        rev_match = re.search(
+            r"(?ms)repo:\s*https://github\.com/astral-sh/ruff-pre-commit\s*\n"
+            r"\s*rev:\s*(v?[^\s#]+)",
+            pre_commit,
+        )
+        self.assertIsNotNone(rev_match, "ruff-pre-commit rev missing")
+        assert rev_match is not None
+        rev = rev_match.group(1).removeprefix("v")
+        self.assertEqual(rev, pinned)
 
     def test_source_tree_has_no_symlinks_or_bytecode(self) -> None:
         for path in SKILL.rglob("*"):
