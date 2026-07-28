@@ -192,7 +192,7 @@ python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>
 
 Fix every reported error. Do not weaken the validator or edit the report around a legitimate inconsistency. When Python is unavailable, manually perform every validation implemented by the script and record that the mechanical validator could not run.
 
-When the optional MCP companion is in use under the D14 rules in `SKILL.md`, `validate_findings` with UTF-8 `content` + `content_sha256` is an allowed front-end to the same validator for candidates within the companion size bound. Default to the CLI; above the MCP size bound, use the CLI with an on-disk candidate.
+When the optional MCP companion is in use under the D14 rules in `SKILL.md`, `validate_findings` with UTF-8 `content` + `content_sha256` is an allowed front-end for schema validation of candidates within the companion size bound. Its optional `canonical_root` argument checks only the report's *stated* Canonical root metadata (not on-disk path placement); the mandatory CLI post-write pass with `--canonical-root` still enforces path + stated-root identity. Default to the CLI; above the MCP size bound, use the CLI with an on-disk candidate. Snapshot content returned over MCP is likewise capped at the companion size bound — larger on-disk reports return digest/size only and require the CLI `--snapshot` path for exact bytes.
 
 ## Digest-gated replacement and concurrent edits
 

@@ -7,6 +7,7 @@ This repo is the development workbench for the `super-review` Agent Skill. Read 
 ## Commands
 
 - `make check` (= `python3 scripts/check.py`) — full offline gate: structure/version/provenance checks, all tests, build + dist verification. Run before declaring any work done.
+- `make companion-test` — when `companion/` changed: sync the companion env and run its pytest suite (also covered by the Companion MCP CI job).
 - Narrow test loops (custom runners, not pytest): `python3 -I src/super-review/tests/run_tests.py`, `python3 -I tests/run_tests.py`, or a single module e.g. `python3 -I src/super-review/tests/test_validate_findings.py`.
 - `make lint` — ruff lint + ruff format check + ty type check (via `uv run`; deps come from `uv sync --dev`). Run alongside `make check` before completion. `make fmt` reformats.
 - `make spec` — external spec validation; requires `skills-ref` (`uv sync --dev` or `pip install -r requirements-dev.txt`). If unavailable, report it — don't skip silently.

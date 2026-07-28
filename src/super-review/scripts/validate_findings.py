@@ -2138,18 +2138,18 @@ def _snapshot_payload(result: Snapshot) -> dict[str, object]:
         "digest": result.digest,
         "size": 0 if result.data is None else len(result.data),
         "human_block_ids": result.human_block_ids(),
+        "content": None,
+        "content_sha256": None,
+        "content_base64": None,
     }
-    if result.data is not None:
+    if result.data is None:
+        return payload
+    payload["content_sha256"] = result.digest
+    try:
+        payload["content"] = result.data.decode("utf-8")
+    except UnicodeDecodeError:
+        # Non-UTF-8 reports cannot use the text wire contract; expose exact bytes.
         payload["content_base64"] = base64.b64encode(result.data).decode("ascii")
-        payload["content_sha256"] = result.digest
-        try:
-            payload["content"] = result.data.decode("utf-8")
-        except UnicodeDecodeError:
-            payload["content"] = None
-    else:
-        payload["content_base64"] = None
-        payload["content_sha256"] = None
-        payload["content"] = None
     return payload
 
 

@@ -90,36 +90,55 @@ def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
         """Return exact on-disk FINDINGS.md bytes/digest, or MISSING if absent.
 
         The digest is advisory. Agents needing prior-report revalidation must use
-        the returned content bytes. commit_bytes recomputes starting state.
+        the returned content bytes when within the MCP size bound. Larger reports
+        require the skill-root CLI snapshot. commit_bytes recomputes starting state.
         """
+        target = Path(path)
+        if target.name != "FINDINGS.md":
+            return {
+                "ok": False,
+                "error": "snapshot path basename must be FINDINGS.md",
+            }
         try:
-            result = validate_mod.snapshot(Path(path))
+            result = validate_mod.snapshot(target)
         except validate_mod.SnapshotError as exc:
             return {"ok": False, "error": str(exc)}
+        size = 0 if result.data is None else len(result.data)
         payload: dict[str, Any] = {
             "ok": True,
             "status": result.status,
             "digest": result.digest,
-            "size": 0 if result.data is None else len(result.data),
+            "size": size,
             "human_block_ids": result.human_block_ids(),
             "content": None,
             "content_sha256": None,
+            "mcp_max_content_bytes": MCP_MAX_CONTENT_BYTES,
             "note": (
                 "Snapshot digest is advisory; commit recomputes starting state. "
-                "Use content bytes for prior-report revalidation."
+                "Use content bytes for prior-report revalidation when present."
             ),
         }
-        if result.data is not None:
-            try:
-                payload["content"] = result.data.decode("utf-8")
-                payload["content_sha256"] = result.digest
-            except UnicodeDecodeError:
-                payload["ok"] = False
-                payload["error"] = (
-                    "on-disk report is not valid UTF-8; use the skill-root CLI snapshot"
-                )
-                payload["content"] = None
-                payload["content_sha256"] = result.digest
+        if result.data is None:
+            return payload
+        if size > MCP_MAX_CONTENT_BYTES:
+            payload["content"] = None
+            payload["content_sha256"] = result.digest
+            payload["note"] = (
+                f"on-disk report is {size} bytes, above the MCP limit of "
+                f"{MCP_MAX_CONTENT_BYTES}; use the skill-root CLI snapshot "
+                "(`validate_findings.py --snapshot`) for exact bytes"
+            )
+            return payload
+        try:
+            payload["content"] = result.data.decode("utf-8")
+            payload["content_sha256"] = result.digest
+        except UnicodeDecodeError:
+            payload["ok"] = False
+            payload["error"] = (
+                "on-disk report is not valid UTF-8; use the skill-root CLI snapshot"
+            )
+            payload["content"] = None
+            payload["content_sha256"] = result.digest
         return payload
 
     if enable_commit:

@@ -74,6 +74,12 @@ python3 scripts/check.py
 make lint
 ```
 
+When `companion/` changed, also run:
+
+```bash
+make companion-test
+```
+
 When `skills-ref` is installed, also run:
 
 ```bash
