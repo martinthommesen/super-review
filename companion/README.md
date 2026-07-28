@@ -59,6 +59,10 @@ claude mcp add --scope user --transport stdio super-review -- \
   --skill-root /absolute/path/to/src/super-review
 ```
 
+### Cursor plugin
+
+This repository ships as a Cursor plugin via [`.cursor-plugin/plugin.json`](../.cursor-plugin/plugin.json). The plugin loads the canonical skill from `src/super-review/` and starts this companion with `${PLUGIN_ROOT}` paths (see [`src/client-adapters/cursor/mcp.json`](../src/client-adapters/cursor/mcp.json)). Prefer a **user-level** Cursor plugin install so a reviewed repo cannot override the server by project scope alone (D14). Cursor's MCP tool-approval UI is the write gate that allows `--enable-commit` in that bundle.
+
 Re-check with host tooling that the *active* resolved entry is this executable and not a project/local override before affirming MCP use.
 
 ## Wire contract

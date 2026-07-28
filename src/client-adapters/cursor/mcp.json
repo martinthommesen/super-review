@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "super-review": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "-m",
+        "uv",
+        "run",
+        "--directory",
+        "${PLUGIN_ROOT}/companion",
+        "--frozen",
+        "super-review-companion",
+        "--skill-root",
+        "${PLUGIN_ROOT}/src/super-review",
+        "--enable-commit"
+      ]
+    }
+  }
+}

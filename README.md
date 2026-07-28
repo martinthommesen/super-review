@@ -8,7 +8,7 @@
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-It works with Claude Code, GitHub Copilot CLI, Codex, and other hosts that load Agent Skills. The current skill version is **1.5.0**.
+It works with Claude Code, GitHub Copilot CLI, Codex, Cursor, and other hosts that load Agent Skills. The current skill version is **1.5.0**.
 
 ## Why it is different
 
@@ -56,6 +56,16 @@ codex plugin add super-review@super-review
 ```
 
 Invoke the installed plugin explicitly as `$super-review:super-review`.
+
+#### Cursor
+
+This repository is a Cursor plugin (`.cursor-plugin/plugin.json`). It installs the canonical skill plus the optional FINDINGS companion MCP.
+
+Prefer a **user-level** plugin install so the companion is not registered only through a reviewed repository's project config (decision D14). Install from the Cursor marketplace once published, or add this repository as a local/team marketplace plugin and install `super-review` at user scope.
+
+Requirements on the machine: `python3` and [`uv`](https://docs.astral.sh/uv/) (the plugin MCP entry runs `python3 -m uv run --directory …/companion`).
+
+Invoke the skill explicitly (for example via the plugin command or by naming `$super-review` / `@super-review` / `/super-review` per the skill gate). Cursor prompts before MCP tool calls; the bundled companion enables `commit_findings` under that approval gate, and the skill still requires a trusted CLI post-validate after any MCP commit.
 
 ### Direct skill installation
 
@@ -115,6 +125,8 @@ python3 -I "$SKILL_ROOT/scripts/commit_findings.py" --help
 ### Optional MCP companion
 
 `companion/` is an optional typed MCP front-end over those helpers. It is **not** in the portable skill ZIP. Default to the skill-root CLI; use the companion only with host-attested active-server provenance and user affirmation (decision D14), and always post-validate commits via the CLI. See [`companion/README.md`](companion/README.md).
+
+Cursor users can install this repository as a Cursor plugin (user user-level) to get the skill and companion together; see [Cursor](#cursor) above.
 
 ## This repository
 

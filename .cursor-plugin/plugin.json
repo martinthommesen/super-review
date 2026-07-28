@@ -1,0 +1,26 @@
+{
+  "name": "super-review",
+  "version": "1.5.0",
+  "description": "Exhaustive, evidence-based whole-repository review with explicit invocation, plus an optional FINDINGS MCP companion.",
+  "author": {
+    "name": "Martin Thommesen"
+  },
+  "homepage": "https://github.com/martinthommesen/super-review",
+  "repository": "https://github.com/martinthommesen/super-review",
+  "license": "Apache-2.0",
+  "keywords": [
+    "architecture",
+    "code-review",
+    "findings",
+    "mcp",
+    "reliability",
+    "security"
+  ],
+  "skills": [
+    "./src/super-review"
+  ],
+  "commands": [
+    "./src/client-adapters/cursor/commands"
+  ],
+  "mcpServers": "./src/client-adapters/cursor/mcp.json"
+}

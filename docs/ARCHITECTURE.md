@@ -16,13 +16,14 @@ The workbench has two deliberately separate layers.
 
 ### Marketplace adapters
 
-The repository exposes three client-native marketplace catalogs without duplicating the skill:
+The repository exposes four client-native marketplace/plugin catalogs without duplicating the skill:
 
 - `.claude-plugin/marketplace.json` with `src/.claude-plugin/plugin.json` for Claude Code;
 - `.github/plugin/marketplace.json` with `src/plugin.json` for GitHub Copilot CLI;
-- `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex.
+- `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex;
+- `.cursor-plugin/plugin.json` for Cursor (repo-root single-plugin manifest).
 
-Every catalog resolves `src/` as its plugin root. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`; explicit-only activation is enforced by the skill description and invocation gate rather than client invocation-control frontmatter, which is not portable and blocks the Skill-tool path Claude Code uses even for user-typed commands. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
+Claude, Copilot, and Codex catalogs resolve `src/` as their plugin root. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`; explicit-only activation is enforced by the skill description and invocation gate rather than client invocation-control frontmatter, which is not portable and blocks the Skill-tool path Claude Code uses even for user-typed commands. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Cursor's plugin root is the repository itself: it points `skills` at `./src/super-review`, ships a thin Cursor command under `src/client-adapters/cursor/commands/`, and registers the optional companion MCP from `src/client-adapters/cursor/mcp.json` using `${PLUGIN_ROOT}` so the companion binds to the installed skill copy. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
 
 ### Repository workbench
 

@@ -11,7 +11,7 @@ Compatibility: Requires filesystem access to the target repository or directory 
 
 ## Invocation gate
 
-Run only after an explicit skill mention. For direct installs, prefer `$super-review` in Codex, accept `@super-review` on mention-based clients, and accept `/super-review` where supported. For marketplace installs, also accept `$super-review:super-review` in Codex and `/super-review:super-review` in Claude Code. Do not activate for a generic review, audit, architecture assessment, security review, or codebase analysis.
+Run only after an explicit skill mention. For direct installs, prefer `$super-review` in Codex, accept `@super-review` on mention-based clients, and accept `/super-review` where supported. For marketplace installs, also accept `$super-review:super-review` in Codex and `/super-review:super-review` in Claude Code. Cursor installs the same skill through the repo-root Cursor plugin; invoke it explicitly by the skill/command name after install. Do not activate for a generic review, audit, architecture assessment, security review, or codebase analysis.
 
 ```text
 $super-review [repository path or directory] [optional review mode and context]
