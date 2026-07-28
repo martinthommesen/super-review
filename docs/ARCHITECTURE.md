@@ -31,7 +31,7 @@ Root `scripts/`, root `tests/`, docs, CI, build metadata, marketplace catalogs, 
 
 ### Optional MCP companion
 
-`companion/` is an optional typed front-end over the shipped FINDINGS helpers. It is outside the portable ZIP and every marketplace payload (those still resolve from `src/` only). The companion has its own `pyproject.toml`, lockfile, and CI job so the MCP SDK never enters the stdlib-only skill or root `scripts/` trees. See decision D14: default to the skill-root CLI; use MCP only with host-attested active-server provenance plus user affirmation; always post-validate commits via the CLI; expose `commit_findings` only when the host gates writes to explicit skill invocation.
+`companion/` is an optional typed front-end over the shipped FINDINGS helpers. It is outside the portable ZIP and every marketplace payload (those still resolve from `src/` only). The companion has its own `pyproject.toml`, lockfile, and CI job so the MCP SDK never enters the stdlib-only skill or root `scripts/` trees. See decision D14: default to the skill-root CLI; use MCP only with host-attested active-server provenance plus user affirmation; always post-validate commits via the CLI; expose `commit_findings` only when the host gates writes to explicit skill invocation with a gate Auto-run/allowlist modes cannot skip. The bundled Cursor MCP entry therefore stays read-only.
 
 Helper APIs used by the companion:
 

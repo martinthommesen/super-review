@@ -63,9 +63,9 @@ This repository is a Cursor plugin (`.cursor-plugin/plugin.json`). It installs t
 
 Prefer a **user-level** plugin install so the companion is not registered only through a reviewed repository's project config (decision D14). Install from the Cursor marketplace once published, or add this repository as a local/team marketplace plugin and install `super-review` at user scope.
 
-Requirements on the machine: `python3` and [`uv`](https://docs.astral.sh/uv/) (the plugin MCP entry runs `python3 -m uv run --directory …/companion`).
+Requirements on the machine: `python3` and the [`uv`](https://docs.astral.sh/uv/) executable on `PATH` (the plugin MCP entry runs `uv run --directory …/companion`).
 
-Invoke the skill explicitly (for example via the plugin command or by naming `$super-review` / `@super-review` / `/super-review` per the skill gate). Cursor prompts before MCP tool calls; the bundled companion enables `commit_findings` under that approval gate, and the skill still requires a trusted CLI post-validate after any MCP commit.
+Invoke the skill explicitly (for example via the plugin command or by naming `$super-review` / `@super-review` / `/super-review` per the skill gate). The bundled Cursor companion is **read-only** (no `commit_findings`): Cursor Auto-run / Auto-review can invoke allowlisted or classifier-approved MCP tools without a prompt, so per-call MCP approval is not a D14 write gate. Keep commits on the skill-root CLI unless you add a separate host gate that Auto-run cannot bypass.
 
 ### Direct skill installation
 

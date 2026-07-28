@@ -4,7 +4,9 @@ import hashlib
 import importlib.util
 import json
 import re
+import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -194,12 +196,42 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(mcp_relative, "./src/client-adapters/cursor/mcp.json")
         mcp = json.loads((ROOT / mcp_relative).read_text(encoding="utf-8"))
         server = mcp["mcpServers"]["super-review"]
-        self.assertEqual(server["command"], "python3")
+        self.assertEqual(server["command"], "uv")
         args = server["args"]
+        self.assertEqual(args[0], "run")
+        self.assertNotIn("-m", args)
+        self.assertNotIn("python3", [server["command"], *args])
         self.assertIn("${PLUGIN_ROOT}/companion", args)
         self.assertIn("${PLUGIN_ROOT}/src/super-review", args)
-        self.assertIn("--enable-commit", args)
+        self.assertNotIn("--enable-commit", args)
         self.assertIn("--frozen", args)
+
+    def test_cursor_mcp_launch_command_smoke(self) -> None:
+        """Exercise the exact bundled MCP argv against the installed uv executable."""
+        if shutil.which("uv") is None:
+            self.skipTest("uv executable not on PATH")
+        mcp = json.loads(
+            (ROOT / "src" / "client-adapters" / "cursor" / "mcp.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        server = mcp["mcpServers"]["super-review"]
+        args = [arg.replace("${PLUGIN_ROOT}", str(ROOT)) for arg in server["args"]]
+        completed = subprocess.run(
+            [server["command"], *args, "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
+        )
+        combined = f"{completed.stdout}\n{completed.stderr}"
+        self.assertIn("--skill-root", combined)
+        self.assertIn("--enable-commit", combined)
 
     def test_original_prompt_provenance(self) -> None:
         prompt = ROOT / "docs" / "ORIGINAL_REVIEW_PROMPT.md"

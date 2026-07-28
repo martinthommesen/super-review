@@ -49,7 +49,12 @@ example:
 	$(PYTHON_ENV) $(PYTHON) scripts/generate_example.py
 
 companion-test:
-	cd companion && $(UV) sync --frozen && $(UV) run pytest
+	cd companion && \
+	if command -v $(UV) >/dev/null 2>&1; then \
+	  $(UV) sync --frozen && $(UV) run pytest; \
+	else \
+	  $(PYTHON_ENV) $(PYTHON) -m uv sync --frozen && $(PYTHON_ENV) $(PYTHON) -m uv run pytest; \
+	fi
 
 clean:
 	$(PYTHON_ENV) $(PYTHON) scripts/clean.py

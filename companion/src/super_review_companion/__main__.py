@@ -27,7 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Expose commit_findings. Only enable on hosts that gate writes to "
-            "explicit super-review invocation or equivalent per-write approval (D1)."
+            "explicit super-review invocation (or equivalent per-write approval) "
+            "with a gate Auto-run/allowlist modes cannot skip (D1/D14)."
         ),
     )
     return parser

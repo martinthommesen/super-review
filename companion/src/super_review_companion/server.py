@@ -17,6 +17,20 @@ from super_review_companion.wire import (
 )
 
 
+def _absolute_repo_root(repo_root: str) -> Path | dict[str, Any]:
+    """Require an absolute existing directory; return Path or an error payload."""
+    requested = Path(repo_root).expanduser()
+    if not requested.is_absolute():
+        return {"ok": False, "error": "repo_root must be an absolute path"}
+    try:
+        root = requested.resolve(strict=True)
+    except OSError as exc:
+        return {"ok": False, "error": f"cannot resolve repo_root: {exc}"}
+    if not root.is_dir():
+        return {"ok": False, "error": f"repo_root is not a directory: {root}"}
+    return root
+
+
 def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
     helpers = load_helpers(skill_root)
     fingerprint_mod = helpers["fingerprint"]
@@ -95,18 +109,10 @@ def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
         the returned content bytes when within the MCP size bound. Larger reports
         require the skill-root CLI snapshot. commit_bytes recomputes starting state.
         """
-        requested = Path(repo_root).expanduser()
-        if not requested.is_absolute():
-            return {
-                "ok": False,
-                "error": "repo_root must be an absolute path",
-            }
-        try:
-            root = requested.resolve(strict=True)
-        except OSError as exc:
-            return {"ok": False, "error": f"cannot resolve repo_root: {exc}"}
-        if not root.is_dir():
-            return {"ok": False, "error": f"repo_root is not a directory: {root}"}
+        resolved = _absolute_repo_root(repo_root)
+        if isinstance(resolved, dict):
+            return resolved
+        root = resolved
         target = root / "FINDINGS.md"
         try:
             result = validate_mod.snapshot(target)
@@ -164,9 +170,18 @@ def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
         ) -> dict[str, Any]:
             """Commit UTF-8 FINDINGS bytes when expected_sha256 still matches.
 
-            Hosts must gate this tool behind explicit skill invocation approval.
-            After success, always post-validate via the skill-root CLI.
+            Hosts must gate this tool behind explicit skill invocation approval
+            that Auto-run/allowlist modes cannot skip. After success, always
+            post-validate via the skill-root CLI.
             """
+            resolved = _absolute_repo_root(repo_root)
+            if isinstance(resolved, dict):
+                return {
+                    "ok": False,
+                    "status": "error",
+                    "error": resolved["error"],
+                    "post_validate_required": True,
+                }
             try:
                 data = encode_content(content, content_sha256)
                 expected = normalize_expected_digest(expected_sha256)
@@ -185,7 +200,7 @@ def build_server(skill_root: Path, *, enable_commit: bool = False) -> FastMCP:
                 }
             try:
                 result = commit_mod.commit_bytes(
-                    repo_root=Path(repo_root),
+                    repo_root=resolved,
                     candidate_bytes=data,
                     expected_digest=expected,
                     lock_timeout=max(0.0, lock_timeout),

@@ -14,7 +14,7 @@ Optional MCP front-end for the shipped FINDINGS helpers. It does **not** replace
 
 ## Write tool gate (D1)
 
-By default the server exposes only read/validate/fingerprint tools (`fingerprint_finding`, `validate_findings`, `snapshot_findings`). `snapshot_findings` takes an absolute `repo_root` and reads only `<repo_root>/FINDINGS.md`. Pass `--enable-commit` **only** on hosts that enforce an authorization/invocation gate tying writes to explicit `$/@/`/`super-review` invocation (or equivalent per-write approval). Without that gate, keep commit on the CLI.
+By default the server exposes only read/validate/fingerprint tools (`fingerprint_finding`, `validate_findings`, `snapshot_findings`). `snapshot_findings` and `commit_findings` both require an absolute `repo_root` and only touch `<repo_root>/FINDINGS.md`. Pass `--enable-commit` **only** on hosts that enforce an authorization/invocation gate tying writes to explicit `$/@/`/`super-review` invocation (or equivalent per-write approval) that Auto-run/allowlist modes cannot skip. Per-call MCP approval UIs alone are not enough when the host can auto-run MCP tools. Without that gate, keep commit on the CLI.
 
 ## Install
 
@@ -61,7 +61,9 @@ claude mcp add --scope user --transport stdio super-review -- \
 
 ### Cursor plugin
 
-This repository ships as a Cursor plugin via [`.cursor-plugin/plugin.json`](../.cursor-plugin/plugin.json). The plugin loads the canonical skill from `src/super-review/` and starts this companion with `${PLUGIN_ROOT}` paths (see [`src/client-adapters/cursor/mcp.json`](../src/client-adapters/cursor/mcp.json)). Prefer a **user-level** Cursor plugin install so a reviewed repo cannot override the server by project scope alone (D14). Cursor's MCP tool-approval UI is the write gate that allows `--enable-commit` in that bundle.
+This repository ships as a Cursor plugin via [`.cursor-plugin/plugin.json`](../.cursor-plugin/plugin.json). The plugin loads the canonical skill from `src/super-review/` and starts this companion with `${PLUGIN_ROOT}` paths (see [`src/client-adapters/cursor/mcp.json`](../src/client-adapters/cursor/mcp.json)). Prefer a **user-level** Cursor plugin install so a reviewed repo cannot override the server by project scope alone (D14).
+
+The bundled Cursor MCP entry launches the installed `uv` executable (`uv run --directory ${PLUGIN_ROOT}/companion …`) and does **not** pass `--enable-commit`. Cursor Auto-run / Auto-review can run allowlisted or classifier-approved MCP tools without a prompt, so exposing `commit_findings` in the default bundle would let an unrelated agent turn write `FINDINGS.md` without `/super-review`. Keep commits on the skill-root CLI for Cursor. Do not add `--enable-commit` to a Cursor MCP entry unless you have a separate write authorization path that Auto-run cannot bypass.
 
 Re-check with host tooling that the *active* resolved entry is this executable and not a project/local override before affirming MCP use.
 

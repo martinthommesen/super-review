@@ -178,13 +178,28 @@ class CompanionServerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir) / "repo"
             repo.mkdir()
-            content = rf.build_report(canonical_root=str(repo))
+            root = str(repo.resolve())
+            content = rf.build_report(canonical_root=root)
             digest = digest_bytes(content.encode("utf-8"))
+            relative = _call_tool(
+                server,
+                "commit_findings",
+                {
+                    "repo_root": "repo",
+                    "content": content,
+                    "content_sha256": digest,
+                    "expected_sha256": "MISSING",
+                },
+            )
+            self.assertFalse(relative["ok"])
+            self.assertEqual(relative["status"], "error")
+            self.assertIn("absolute", relative["error"])
+
             committed = _call_tool(
                 server,
                 "commit_findings",
                 {
-                    "repo_root": str(repo),
+                    "repo_root": root,
                     "content": content,
                     "content_sha256": digest,
                     "expected_sha256": "MISSING",
@@ -201,7 +216,7 @@ class CompanionServerTests(unittest.TestCase):
                 server,
                 "commit_findings",
                 {
-                    "repo_root": str(repo),
+                    "repo_root": root,
                     "content": content,
                     "content_sha256": digest,
                     "expected_sha256": "MISSING",
@@ -214,7 +229,7 @@ class CompanionServerTests(unittest.TestCase):
                 server,
                 "commit_findings",
                 {
-                    "repo_root": str(repo),
+                    "repo_root": root,
                     "content": content,
                     "content_sha256": "sha256:" + "0" * 64,
                     "expected_sha256": digest,

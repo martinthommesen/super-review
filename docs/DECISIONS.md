@@ -62,7 +62,7 @@ Therefore:
 2. MCP use requires host-attested provenance of the *active resolved* server (scope and executable/endpoint) proving it is not a local/project override, plus explicit user affirmation for the run. If the host cannot attest provenance — or managed policy cannot exclude project/local overrides — use the CLI only.
 3. Server handshake values are not a trust root.
 4. After any MCP commit that claims success, post-validate `<canonical-root>/FINDINGS.md` with the skill-root CLI.
-5. On hosts without a write-authorization gate tied to explicit skill invocation, the companion must not expose `commit_findings`; commit remains CLI-only.
+5. On hosts without a write-authorization gate tied to explicit skill invocation, the companion must not expose `commit_findings`; commit remains CLI-only. Per-call MCP approval UIs that Auto-run, allowlist, or classifier modes can skip are not such a gate. The bundled Cursor plugin therefore ships the companion read-only (no `--enable-commit`).
 6. Do not recommend project-scoped companion installation in reviewed repositories.
 
 The companion lives outside the portable skill ZIP under `companion/`, with its own dependency pins and CI job.
