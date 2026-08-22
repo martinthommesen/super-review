@@ -529,13 +529,11 @@ def commit_bytes(
                             os.close(placeholder_fd)
                         os.replace(temp_path, target)
                     except BaseException:
-                        # One cleanup handler covers placeholder setup and the
-                        # replace itself: remove the path only while it still
-                        # is our placeholder; never delete a file another
-                        # writer put there meanwhile. Identity is captured
-                        # before any failable setup step so a mode failure
-                        # cannot orphan the empty placeholder; if identity was
-                        # never captured, the path is left alone.
+                        # Remove the path only while it still is our
+                        # placeholder (identity is read before the failable
+                        # mode step); never delete a file another writer put
+                        # there meanwhile, and without a captured identity
+                        # leave the path alone.
                         if placeholder_info is not None:
                             with contextlib.suppress(OSError):
                                 current_info = os.lstat(target)
