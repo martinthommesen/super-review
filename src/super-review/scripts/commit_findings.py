@@ -4,6 +4,12 @@
 The candidate is opened once without following its final path component. Those
 exact immutable bytes are validated, staged, and committed. The helper never
 re-reads the candidate path after validation.
+
+Concurrency scope: the advisory lock and digest gate fully serialize
+cooperating writers that use this helper. A non-cooperating writer racing the
+final instant of replacement can still win or lose that race; such writers are
+detected best-effort, up to the last pre-replacement read and the post-write
+verification.
 """
 
 from __future__ import annotations

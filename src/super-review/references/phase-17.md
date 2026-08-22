@@ -97,11 +97,11 @@ OPTION A — KEEP AND HARDEN
 - Costs.
 - Risks.
 - Expected lifetime.
-- Situations where this is the correct choice.
+- Correct-use conditions.
 
 OPTION B — INCREMENTAL REDESIGN
 
-- Structural improvement without replacing the entire subsystem.
+- Structural change (without replacing the entire subsystem).
 - Benefits.
 - Costs.
 - Migration steps.
@@ -111,7 +111,7 @@ OPTION B — INCREMENTAL REDESIGN
 
 OPTION C — ALTERNATIVE APPROACH
 
-- A meaningfully different implementation or design.
+- Alternative design (a meaningfully different implementation).
 - Benefits.
 - Costs.
 - New risks.

@@ -11,6 +11,9 @@ Load this file only when canonicalizing review results. It separates defects and
 - Every field is mandatory unless the template marks it conditional. When evidence does not support a field, write `Not applicable — <specific evidence-based reason>` or `Not established — <missing evidence and validation needed>`. Do not omit fields or manufacture content.
 - Active records use `Status: Active`. Resolved, superseded, consolidated, and invalidated identities exist only in the retired registry and concise validation history, not as active canonical records.
 - Use deterministic identity and ID rules from `references/findings-lifecycle.md`.
+- Record numbers use at least three digits (`PREFIX-001`); shorter numbers do not parse as canonical records.
+- Every `Label: value` line inside a record body must be a field defined for that record type (SEC-only fields on `SEC` records, decision-specific fields for the record's stated `Decision`, and Options A–D fields inside improvement records). Colon-led prose inside a field value parses as a new field boundary and is rejected — fence it, indent it, or rephrase it.
+- Enumerated field values (`Effort`, `Risk of the proposed change`) may append an explanation only after ` — `, ` - `, `:`, or ` (`; any other continuation, including a comma, is rejected.
 
 ## Allowed prefixes
 

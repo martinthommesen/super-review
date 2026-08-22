@@ -41,24 +41,38 @@ supporting evidence.
 
 3. DISTINGUISH DEFECTS FROM IMPROVEMENTS
 
-Classify recommendations as one of:
+Classify recommendations with the canonical `Classification` values.
+
+For defects and risks:
 
 - Confirmed defect.
 - Probable defect.
 - Security weakness.
 - Reliability risk.
 - Performance risk.
+- Data-integrity risk.
+- Architectural risk.
 - Maintainability concern.
-- Architectural concern.
 - Product or UX concern.
-- Feature opportunity.
-- Feature-removal candidate.
-- Alternative implementation opportunity.
 - Documentation issue.
 - Testing gap.
 - Operational gap.
+
+For improvements and alternatives:
+
+- Improvement.
+- Alternative implementation opportunity.
+- Architectural alternative.
 - Optional optimization.
+- Workflow simplification.
+
+For positive patterns:
+
 - Positive pattern worth preserving.
+
+Feature work carries no `Classification`; a feature-decision record states a
+`Decision` (Add, Improve, Simplify, Merge, Replace, Deprecate, Remove, Keep,
+Experiment, or Investigate) instead.
 
 Do not present a subjective preference as a correctness defect.
 
@@ -186,13 +200,14 @@ problem.
 
 11. STATE UNCERTAINTY CLEARLY
 
-Use confidence levels:
+Use the canonical `Confidence` values:
 
 - Confirmed.
-- High confidence.
-- Medium confidence.
-- Low confidence.
-- Hypothesis requiring validation.
+- High.
+- Medium.
+- Low.
+- Hypothesis (for defects and improvements) or Requires product validation
+  (for feature decisions).
 
 Explain what evidence would raise or lower confidence.
 

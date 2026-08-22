@@ -67,10 +67,10 @@ Validation:
 <Regression-test level, static checks, reproductions, failure paths, migration checks, security checks, and operational verification.>
 
 Effort:
-<Small | Medium | Large | Program-level, with scope basis.>
+<Small | Medium | Large | Program-level, optionally followed by " — <scope basis>">
 
 Risk of the proposed change:
-<Low | Medium | High, with explanation and rollback controls.>
+<Low | Medium | High, optionally followed by " — <explanation and rollback controls>">
 
 Dependencies:
 <Prerequisite work, evidence, migration, ownership, telemetry, or coordination.>

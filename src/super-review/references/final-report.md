@@ -17,11 +17,13 @@ Starting repository state: <revision and worktree/directory fingerprint>
 Ending repository state: <revision and worktree/directory fingerprint>
 Review time: <ISO 8601 timestamp with timezone>
 Review mode: <mode>
-Starting FINDINGS.md SHA-256: <sha256 digest or MISSING>
+Starting FINDINGS.md SHA-256: <MISSING, or sha256: followed by 64 lowercase hexadecimal characters>
 Existing report revalidated: <Yes | No — file did not exist | Partial — limitation>
 Completion status: <Complete | Partial | Blocked>
 Material limitations: <specific limitations or None>
 ```
+
+These values are cross-checked: `MISSING` pairs exactly with `Existing report revalidated: No — file did not exist` (in both directions); `Completion status: Complete` requires `Existing report revalidated` to be `Yes` or `No — file did not exist`; and `Material limitations: None` is rejected when the completion status is `Partial` or `Blocked`.
 
 Then include:
 

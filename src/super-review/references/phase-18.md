@@ -93,25 +93,26 @@ For every proposed feature addition, provide:
 16. Background-processing changes.
 17. Security implications.
 18. Privacy implications.
-19. Operational implications.
-20. Compatibility implications.
+19. Operational impact.
+20. Compatibility impact.
 21. Dependencies.
 22. Implementation touchpoints.
 23. Test strategy.
 24. Migration strategy.
-25. Rollout strategy.
+25. Rollout or deprecation plan.
 26. Rollback strategy.
 27. Success indicators.
-28. Kill or reconsideration criteria.
+28. Reconsideration or removal criteria.
 29. Estimated effort:
     - Small.
     - Medium.
     - Large.
     - Program-level.
 30. Confidence:
-    - Confirmed need.
-    - Strongly indicated.
-    - Plausible.
+    - Confirmed.
+    - High.
+    - Medium.
+    - Low.
     - Requires product validation.
 
 Do not invent numerical usage, revenue, conversion, or adoption estimates.
@@ -199,11 +200,11 @@ For every replacement recommendation, include:
 - Existing feature.
 - Replacement behavior.
 - Why improvement alone is insufficient.
-- Migration path.
+- Migration strategy.
 - Compatibility period.
 - Data conversion.
 - User communication requirements.
-- Rollback plan.
+- Rollback strategy.
 - Risks introduced by the replacement.
 
 -------------------------------------------------------------------------------
@@ -236,7 +237,7 @@ Do not recommend public feature removal solely because code appears old.
 For every deprecation or removal candidate, provide:
 
 1. Feature or capability.
-2. Concrete evidence.
+2. Concrete removal evidence.
 3. Known consumers.
 4. Possible hidden or external consumers.
 5. Usage evidence available.
@@ -277,18 +278,23 @@ EXPERIMENTS
 
 Feature experiments must include:
 
-- Hypothesis.
+- Experiment hypothesis.
 - Target user or workflow.
 - Minimal experiment.
 - Expected signal.
-- Guardrail metrics.
+- Guardrail indicators.
 - Failure or stop conditions.
 - Data required.
 - Privacy implications.
-- How experimental code will be isolated.
+- Experimental-code isolation.
 - Feature-flag owner.
 - Expiration or review date.
 - Cleanup plan.
+
+Feature investigations must include:
+
+- Evidence-gathering plan.
+- Decision threshold.
 
 Do not recommend permanent feature flags without lifecycle ownership.
 

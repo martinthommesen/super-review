@@ -137,10 +137,10 @@ Validation:
 <Measurement, tests, benchmarks, profiling, failure checks, and acceptance criteria.>
 
 Effort:
-<Small | Medium | Large | Program-level.>
+<Small | Medium | Large | Program-level, optionally followed by " — <scope basis>">
 
 Risk of the proposed change:
-<Low | Medium | High, with explanation.>
+<Low | Medium | High, optionally followed by " — <explanation>">
 
 Dependencies:
 <Prerequisites.>
