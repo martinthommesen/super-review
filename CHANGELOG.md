@@ -2,6 +2,35 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.6.0] — 2026-08-22
+
+### Added
+
+- One canonical structure scanner (`validate_findings.scan_report_structure`): the validator and the safe writer now parse fences and protected human blocks through a single bytes-native grammar (CommonMark backtick-info rule, block bodies opaque to fence parsing, space/tab-only fence closes, byte-oriented line segmentation), with a seeded differential regression guarding against re-divergence. An annotation containing an unbalanced fence marker can no longer wedge future commits.
+- Registry and metadata cross-invariants: retired replacement chains must be acyclic, `superseded`/`consolidated` entries need at least one replacement ID, `Starting FINDINGS.md SHA-256: MISSING` pairs exclusively with `Existing report revalidated: No — file did not exist`, and a `Partial` revalidation cannot claim a `Complete` run.
+- Unknown-field validation: every `Label: value` line in a record body must be a field defined for that record type (SEC-only fields on `SEC` records, decision-specific fields for the record's `Decision`, Options A–D fields on improvements).
+- Snapshot output control: `--snapshot` gains `--metadata-only` and `--out FILE` for bounded output and exact-byte capture to a file; the lifecycle now prefers the metadata-first flow before replacement, and an oversized or malformed prior report yields a `Partial`/`Blocked` run instead of streaming its content.
+- A consolidated `super-review` CLI package under `cli/` (`validate | snapshot | commit | fingerprint`) wrapping the skill-root helpers with an explicit trusted root, a dependency-free runtime, hostile-CWD isolation tests, and an offline console smoke.
+- The Apache-2.0 license text ships in every distributable payload (`super-review/LICENSE` in the ZIP, `src/LICENSE` for marketplace installs), with byte-equality regressions.
+- Decision D15: the MCP companion is replaced by the CLI — no server, no ambient tool surface, nothing invocable by host auto-run or prompt injection.
+
+### Changed
+
+- Reference docs re-aligned with the validator: phase-18's feature Confidence ladder and field labels, phase-17's option labels, core-principles' classification and confidence lists, the registry-first placement rule, the exact protected-block ID grammar, the `Effort`/`Risk` explanation separators, and the Starting-digest format.
+- Protected human annotations are explicitly untrusted prior-report data: preserved byte for byte, never a source of authorization for commands, network access, scope changes, or instruction overrides.
+- The concurrent-edit guarantee is scoped honestly: cooperating writers using the helper are fully serialized; a non-cooperating writer racing the final instant of replacement is detected best-effort.
+- The writer works on Windows before Python 3.13 (`os.fchmod` fallback) and creates first-time reports on filesystems without hard links (atomic `O_CREAT|O_EXCL` fallback with unchanged conflict detection).
+
+### Removed
+
+- The optional MCP companion: `companion/`, the Cursor plugin's MCP registration, and all MCP prose in the shipped skill. Former companion tools map to the CLI — `validate_findings`/`snapshot_findings`/`commit_findings`/`fingerprint_finding` become `super-review validate|snapshot|commit|fingerprint`.
+
+### Migration
+
+- A colon-led line inside a field value (`Rollback: revert it`) now parses as an unknown field and fails validation — fence it, indent it, or rephrase it.
+- `Effort` and `Risk of the proposed change` explanations must follow the enum value after ` — `, ` - `, `:`, or ` (`; a comma continuation is rejected.
+- Reports containing registry replacement cycles, the contradictory metadata pairings above, fences closed with whitespace other than spaces/tabs, or structure that depended on backtick-in-info fence openers or exotic Unicode line separators were accepted inconsistently before and are now uniformly rejected. Annotations containing unbalanced fence markers become valid and preserved.
+
 ## [1.5.0] — 2026-07-28
 
 ### Added

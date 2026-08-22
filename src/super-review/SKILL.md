@@ -5,7 +5,7 @@ description: Performs an exhaustive, evidence-based whole-repository engineering
 
 # Super Review
 
-Version: 1.5.0
+Version: 1.6.0
 
 Compatibility: Requires filesystem access to the target repository or directory and permission to create or update its root `FINDINGS.md`. Git and code-search tools are recommended. Python 3 is recommended for the bundled fingerprint, report-validation, safe-write, and test scripts.
 

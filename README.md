@@ -8,7 +8,7 @@
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-It works with Claude Code, GitHub Copilot CLI, Codex, Cursor, and other hosts that load Agent Skills. The current skill version is **1.5.0**.
+It works with Claude Code, GitHub Copilot CLI, Codex, Cursor, and other hosts that load Agent Skills. The current skill version is **1.6.0**.
 
 ## Why it is different
 
