@@ -717,6 +717,8 @@ Classification: Arbitrary
             self.assertFalse(inside.exists())
 
     def test_snapshot_out_refuses_swapped_output_directory(self) -> None:
+        if os.open not in os.supports_dir_fd:
+            self.skipTest("directory-descriptor support unavailable")
         # Interleaved attack: the output directory is swapped for a symlink
         # into the reviewed repository between the containment check and the
         # write. The pinned-descriptor write must detect the swap and refuse.
