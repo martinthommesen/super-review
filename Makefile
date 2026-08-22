@@ -15,7 +15,7 @@ help:
 	  'make spec     Run the external Agent Skills reference validator' \
 	  'make build    Create a deterministic distributable ZIP' \
 	  'make verify   Verify the distributable and run tests from extraction' \
-	  'make release  Clean, check, spec-validate, build, and verify' \
+	  'make release  Clean, check, spec-validate, CLI-test, build, and verify' \
 	  'make example  Regenerate the valid example FINDINGS.md fixture' \
 	  'make cli-test Sync and test the consolidated CLI package' \
 	  'make clean    Remove generated local artifacts'
@@ -28,17 +28,15 @@ test:
 	$(PYTHON_ENV) $(PYTHON) -I -B src/super-review/tests/run_tests.py
 
 lint:
-	$(UV) run ruff check .
-	$(UV) run ruff format --check .
-	$(UV) run ty check
+	$(UV) run --locked ruff check .
+	$(UV) run --locked ruff format --check .
+	$(UV) run --locked ty check
 
 fmt:
-	$(UV) run ruff format .
+	$(UV) run --locked ruff format .
 
-# Coverage intentionally omits python -I so coverage.py can measure the suites;
-# make test / make check keep isolated-mode execution for the threat model.
-# Skill helper subprocesses may still write __pycache__; always remove it afterward.
-# Diagnostic only (no fail_under); measures suites under coverage.py, not a quality gate.
+# Coverage is diagnostic. The ordinary test and check targets retain isolated
+# Python execution for the untrusted-repository threat model.
 coverage:
 	@$(MAKE) coverage-run; status=$$?; \
 	$(MAKE) coverage-clean-pycache; clean_status=$$?; \
@@ -46,20 +44,20 @@ coverage:
 	exit $$clean_status
 
 coverage-run:
-	$(PYTHON_ENV) $(UV) run coverage erase
-	$(PYTHON_ENV) $(UV) run coverage run tests/run_tests.py
-	$(PYTHON_ENV) $(UV) run coverage run -a src/super-review/tests/run_tests.py
-	$(PYTHON_ENV) $(UV) run coverage report
+	$(PYTHON_ENV) $(UV) run --locked coverage erase
+	$(PYTHON_ENV) $(UV) run --locked coverage run tests/run_tests.py
+	$(PYTHON_ENV) $(UV) run --locked coverage run -a src/super-review/tests/run_tests.py
+	$(PYTHON_ENV) $(UV) run --locked coverage report
 
 coverage-clean-pycache:
-	@$(PYTHON) -c "from pathlib import Path; import shutil; \
-root = Path('.'); \
-[shutil.rmtree(p) for p in root.rglob('__pycache__') if '.venv' not in p.parts and p.is_dir()]; \
-[p.unlink(missing_ok=True) for pat in ('*.pyc', '*.pyo') for p in root.rglob(pat) if '.venv' not in p.parts]"
+	@$(PYTHON_ENV) $(PYTHON) -c "from pathlib import Path; import sys; \
+sys.path.insert(0, 'scripts'); \
+from workspace_hygiene import remove_generated; \
+remove_generated(Path('.'), directory_names=('__pycache__',), suffixes=('.pyc', '.pyo'))"
 
 spec:
 	@if command -v $(UV) >/dev/null 2>&1; then \
-	  $(PYTHON_ENV) $(UV) run python scripts/spec_validate.py; \
+	  $(PYTHON_ENV) $(UV) run --locked python scripts/spec_validate.py; \
 	else \
 	  $(PYTHON_ENV) $(PYTHON) scripts/spec_validate.py; \
 	fi
@@ -70,7 +68,7 @@ build:
 verify:
 	$(PYTHON_ENV) $(PYTHON) scripts/verify_dist.py $(ARTIFACT)
 
-release: clean check spec build verify
+release: clean check spec cli-test build verify
 
 example:
 	$(PYTHON_ENV) $(PYTHON) scripts/generate_example.py
@@ -78,15 +76,15 @@ example:
 cli-test:
 	cd cli && \
 	if command -v $(UV) >/dev/null 2>&1; then \
-	  $(UV) sync --frozen && \
-	  $(UV) run ruff check . && \
-	  $(UV) run ruff format --check . && \
-	  $(UV) run pytest; \
+	  $(PYTHON_ENV) $(UV) sync --locked && \
+	  $(PYTHON_ENV) $(UV) run --locked ruff check . && \
+	  $(PYTHON_ENV) $(UV) run --locked ruff format --check . && \
+	  $(PYTHON_ENV) $(UV) run --locked pytest; \
 	else \
-	  $(PYTHON_ENV) $(PYTHON) -m uv sync --frozen && \
-	  $(PYTHON_ENV) $(PYTHON) -m uv run ruff check . && \
-	  $(PYTHON_ENV) $(PYTHON) -m uv run ruff format --check . && \
-	  $(PYTHON_ENV) $(PYTHON) -m uv run pytest; \
+	  $(PYTHON_ENV) $(PYTHON) -m uv sync --locked && \
+	  $(PYTHON_ENV) $(PYTHON) -m uv run --locked ruff check . && \
+	  $(PYTHON_ENV) $(PYTHON) -m uv run --locked ruff format --check . && \
+	  $(PYTHON_ENV) $(PYTHON) -m uv run --locked pytest; \
 	fi
 
 clean:

@@ -30,7 +30,14 @@ Validation of a path followed by a reread creates a swap race. The writer opens 
 
 ## D8: Optimistic concurrency plus protected human blocks
 
-Atomic replacement prevents partial files but not lost updates. The writer records and rechecks starting state, refuses digest conflicts, and preserves named human annotation blocks byte for byte.
+The writer records and rechecks starting state, refuses digest conflicts, and
+preserves named human annotation blocks byte for byte. Existing reports are
+published by atomic name exchange. The displaced inode is verified against the
+starting state. A failed post-exchange check preserves the private directory for
+recovery and reports a conflict. It never attempts a second pathname exchange,
+because a precheck cannot authorize that source against a hostile same-user
+writer. Platforms without atomic exchange support fail closed for existing
+reports.
 
 ## D9: Deterministic stable identities
 
@@ -68,7 +75,8 @@ Therefore:
 5. On hosts without a write-authorization gate tied to explicit skill invocation, the companion must not expose `commit_findings`; commit remains CLI-only. Per-call MCP approval UIs that Auto-run, allowlist, or classifier modes can skip are not such a gate. The bundled Cursor plugin therefore ships the companion read-only (no `--enable-commit`).
 6. Do not recommend project-scoped companion installation in reviewed repositories.
 
-The companion lives outside the portable skill ZIP under `companion/`, with its own dependency pins and CI job.
+Before D15, the companion lived outside the portable skill ZIP under
+`companion/`, with its own dependency pins and CI job.
 
 ## D15: Replace the MCP companion with a command-line interface
 

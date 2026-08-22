@@ -1,3 +1,2 @@
-# No suppressions are currently required. When gitleaks reports a false
-# positive, record its fingerprint here in the commit-scoped form the CI
-# history scan matches: <commit-sha>:<path>:<rule-id>:<line>.
+# Add only commit-scoped false-positive fingerprints:
+# <commit-sha>:<path>:<rule-id>:<line>

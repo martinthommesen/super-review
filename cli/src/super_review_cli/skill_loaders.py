@@ -1,4 +1,4 @@
-"""Load shipped skill helpers by absolute skill-root path only."""
+"""Load shipped helpers from one validated absolute skill root."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ class SkillLoadError(RuntimeError):
 
 
 def _require_regular_file(path: Path, *, label: str) -> Path:
-    """Reject symlinks and non-regular files, then resolve the path."""
     try:
         info = os.lstat(path)
     except OSError as exc:
@@ -26,13 +25,16 @@ def _require_regular_file(path: Path, *, label: str) -> Path:
         raise SkillLoadError(f"{label} must be a regular file: {path}")
     try:
         return path.resolve(strict=True)
-    except OSError as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise SkillLoadError(f"cannot resolve {label} {path}: {exc}") from exc
 
 
 def resolve_skill_root(skill_root: Path) -> Path:
     """Validate an absolute skill root and its required files."""
-    root = skill_root.expanduser()
+    try:
+        root = skill_root.expanduser()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SkillLoadError(f"cannot expand skill root {skill_root}: {exc}") from exc
     if not root.is_absolute():
         raise SkillLoadError(f"skill root must be an absolute path, got {skill_root}")
     try:
@@ -45,7 +47,7 @@ def resolve_skill_root(skill_root: Path) -> Path:
         raise SkillLoadError(f"skill root is not a directory: {root}")
     try:
         resolved = root.resolve(strict=True)
-    except OSError as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise SkillLoadError(f"cannot resolve skill root {root}: {exc}") from exc
     skill_md = resolved / "SKILL.md"
     _require_regular_file(skill_md, label="SKILL.md")
@@ -66,7 +68,7 @@ def load_helper(skill_root: Path, filename: str, module_name: str) -> ModuleType
     sibling = _require_regular_file(leaf, label="helper")
     try:
         scripts_dir = (root / "scripts").resolve(strict=True)
-    except OSError as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise SkillLoadError(f"cannot resolve skill scripts directory: {exc}") from exc
     if sibling.parent != scripts_dir:
         raise SkillLoadError(f"helper escapes skill scripts directory: {sibling}")
@@ -74,6 +76,24 @@ def load_helper(skill_root: Path, filename: str, module_name: str) -> ModuleType
     if spec is None or spec.loader is None:
         raise SkillLoadError(f"cannot load helper: {sibling}")
     module = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get(module_name)
+    internal_before = {
+        name: loaded
+        for name, loaded in sys.modules.items()
+        if name.startswith("_super_review_")
+    }
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except (Exception, SystemExit) as exc:
+        for name in tuple(sys.modules):
+            if name.startswith("_super_review_") and name not in internal_before:
+                sys.modules.pop(name, None)
+        sys.modules.update(internal_before)
+        if previous is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous
+        detail = str(exc) or type(exc).__name__
+        raise SkillLoadError(f"cannot load helper {sibling}: {detail}") from exc
     return module

@@ -11,6 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SkillPackageTests(unittest.TestCase):
+    def assert_no_script_bytecode(self) -> None:
+        self.assertFalse((ROOT / "scripts" / "__pycache__").exists())
+        self.assertEqual(list((ROOT / "scripts").glob("*.py[co]")), [])
+
     def test_frontmatter_is_portable_and_explicit_only(self) -> None:
         text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         self.assertFalse(
@@ -96,7 +100,13 @@ class SkillPackageTests(unittest.TestCase):
             "commit_findings.py",
         ):
             completed = subprocess.run(
-                [sys.executable, "-I", str(ROOT / "scripts" / script), "--help"],
+                [
+                    sys.executable,
+                    "-I",
+                    "-B",
+                    str(ROOT / "scripts" / script),
+                    "--help",
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -107,6 +117,7 @@ class SkillPackageTests(unittest.TestCase):
                 0,
                 f"{script} failed under isolated mode:\n{completed.stderr}",
             )
+        self.assert_no_script_bytecode()
 
     def test_phase_applicability_is_linked(self) -> None:
         text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -128,12 +139,14 @@ class SkillPackageTests(unittest.TestCase):
                 [
                     sys.executable,
                     "-I",
+                    "-B",
                     str(ROOT / "scripts" / "commit_findings.py"),
                     "--help",
                 ],
                 [
                     sys.executable,
                     "-I",
+                    "-B",
                     str(ROOT / "scripts" / "validate_findings.py"),
                     "--self-test",
                 ],
@@ -153,6 +166,7 @@ class SkillPackageTests(unittest.TestCase):
                     f"hostile-cwd isolation failed: {completed.stderr}",
                 )
             self.assertFalse(marker.exists(), "a target-relative module was executed")
+        self.assert_no_script_bytecode()
 
 
 if __name__ == "__main__":

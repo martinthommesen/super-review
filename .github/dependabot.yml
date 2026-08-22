@@ -1,7 +1,5 @@
-# Automated dependency updates. The root dev pins are dual-pinned: any bump to
-# requirements-dev.txt must land together with the matching change to
-# [dependency-groups].dev in pyproject.toml (and vice versa) or the parity
-# regression in tests/test_repository.py fails CI.
+# Root Python pins are duplicated in pyproject.toml and requirements-dev.txt.
+# Their parity regression requires Dependabot updates to keep both in sync.
 version: 2
 updates:
   - package-ecosystem: github-actions

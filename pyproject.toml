@@ -28,8 +28,7 @@ extend-select = ["I"]
 
 [tool.ty.environment]
 python-version = "3.11"
-# Shipped tests import sibling runtime helpers resolved from the skill root at
-# runtime; mirror that resolution for static analysis.
+# Match the shipped helpers' runtime sibling resolution during static analysis.
 extra-paths = ["src/super-review/scripts", "src/super-review/tests"]
 
 [tool.ty.src]

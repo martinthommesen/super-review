@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Validate the structure and cross-references of a Super Review report."""
-
 from __future__ import annotations
 
 import argparse
@@ -14,6 +12,7 @@ import re
 import stat
 import sys
 import tempfile
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PureWindowsPath
@@ -24,7 +23,7 @@ MAX_REPORT_BYTES = 64 * 1024 * 1024
 
 
 def _load_sibling(module_name: str, filename: str) -> ModuleType:
-    """Load a sibling module by trusted script path, including under Python -I."""
+    """Load a bundled sibling by canonical path, including under Python ``-I``."""
     script_dir = Path(__file__).resolve(strict=True).parent
     leaf = script_dir / filename
     try:
@@ -42,14 +41,41 @@ def _load_sibling(module_name: str, filename: str) -> ModuleType:
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load bundled sibling module: {sibling}")
     module = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get(module_name)
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except (Exception, SystemExit):
+        if previous is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous
+        raise
     return module
 
 
-_FINGERPRINT = _load_sibling(
-    "_super_review_finding_fingerprint", "finding_fingerprint.py"
-)
+_DEPENDENCIES = {
+    "_super_review_finding_fingerprint": "finding_fingerprint.py",
+    "_super_review_report_store": "report_store.py",
+}
+_previous_dependencies = {name: sys.modules.get(name) for name in _DEPENDENCIES}
+try:
+    _FINGERPRINT = _load_sibling(
+        "_super_review_finding_fingerprint",
+        _DEPENDENCIES["_super_review_finding_fingerprint"],
+    )
+    _REPORT_STORE = _load_sibling(
+        "_super_review_report_store",
+        _DEPENDENCIES["_super_review_report_store"],
+    )
+except (Exception, SystemExit):
+    for _name, _previous in _previous_dependencies.items():
+        if _previous is None:
+            sys.modules.pop(_name, None)
+        else:
+            sys.modules[_name] = _previous
+    raise
+del _previous_dependencies
 Identity = _FINGERPRINT.Identity
 compute_fingerprint = _FINGERPRINT.compute_fingerprint
 
@@ -555,7 +581,6 @@ def _line_error(line: int, message: str) -> str:
 
 
 def _ranges_overlap(left: tuple[int, int], right: tuple[int, int]) -> bool:
-    """Return whether two inclusive integer ranges overlap."""
     return left[0] <= right[1] and right[0] <= left[1]
 
 
@@ -661,14 +686,12 @@ def scan_report_structure(data: bytes) -> StructureScan:
 
 
 def _decoded_scan_lines(data: bytes) -> list[str]:
-    """Decode UTF-8 lines with exactly the scanner's byte segmentation."""
     return [
         line.rstrip(b"\r\n").decode("utf-8") for line in data.splitlines(keepends=True)
     ]
 
 
 def _line_set(ranges: Iterable[tuple[int, int]]) -> set[int]:
-    """Expand inclusive ranges into line numbers."""
     result: set[int] = set()
     for start, end in ranges:
         result.update(range(start, end + 1))
@@ -695,7 +718,6 @@ def extract_human_blocks(text: str) -> dict[str, str]:
 def _extract_registry(
     lines: list[str], ignored_lines: set[int]
 ) -> tuple[dict | None, tuple[int, int] | None, list[str]]:
-    """Parse the one registry block outside ignored line ranges."""
     starts = [
         i
         for i, line in enumerate(lines, start=1)
@@ -731,10 +753,37 @@ def _extract_registry(
     return registry, (start, end), errors
 
 
+def _nodes_forming_or_reaching_cycles(
+    edges: dict[str, set[str]],
+) -> set[str]:
+    nodes = set(edges)
+    for targets in edges.values():
+        nodes.update(targets)
+    remaining_outgoing = {node: len(edges.get(node, set())) for node in nodes}
+    predecessors = {node: set() for node in nodes}
+    for source, targets in edges.items():
+        for target in targets:
+            predecessors[target].add(source)
+
+    terminal = deque(
+        node
+        for node, outgoing_count in remaining_outgoing.items()
+        if outgoing_count == 0
+    )
+    while terminal:
+        removed = terminal.popleft()
+        for predecessor in predecessors[removed]:
+            remaining_outgoing[predecessor] -= 1
+            if remaining_outgoing[predecessor] == 0:
+                terminal.append(predecessor)
+    return {
+        node for node, outgoing_count in remaining_outgoing.items() if outgoing_count
+    }
+
+
 def _validate_registry(
     registry: dict | None,
 ) -> tuple[set[str], set[str], dict[str, str], list[str]]:
-    """Validate registry identities, replacements, and sequence counters."""
     errors: list[str] = []
     if registry is None:
         return set(), set(), {}, errors
@@ -868,29 +917,19 @@ def _validate_registry(
                 f"registry retired {record_id} status {status} requires at least one replacement ID"
             )
 
-    # Remove nodes whose chains terminate. Remaining nodes form or reach a cycle.
     chain_edges = {
         record_id: {
             replacement
-            for replacement in replacements
+            for replacement in replacement_map.get(record_id, [])
             if replacement in retired_ids and replacement != record_id
         }
-        for record_id, replacements in replacement_map.items()
+        for record_id in retired_ids
     }
-    while True:
-        terminal = [
-            record_id for record_id, targets in chain_edges.items() if not targets
-        ]
-        if not terminal:
-            break
-        for record_id in terminal:
-            del chain_edges[record_id]
-        for targets in chain_edges.values():
-            targets.difference_update(terminal)
-    if chain_edges:
+    cycle_reachable = _nodes_forming_or_reaching_cycles(chain_edges)
+    if cycle_reachable:
         errors.append(
             "registry retired replacement_ids form a cycle involving: "
-            + ", ".join(sorted(chain_edges))
+            + ", ".join(sorted(cycle_reachable))
         )
 
     for prefix, max_number in max_numbers.items():
@@ -1176,15 +1215,15 @@ def _placeholder_in_line(line: str) -> str | None:
 
 
 def _validate_option_sections(record: Record) -> list[str]:
-    """Validate improvement option fields and order."""
     errors: list[str] = []
     options = OPTION_FIELDS
     structural_lines = record.structural_body.splitlines()
     content_lines = record.content_body.splitlines()
-    positions: list[tuple[int, str]] = []
-    for index, line in enumerate(structural_lines):
-        if line in options:
-            positions.append((index, line))
+    positions = [
+        (index, line)
+        for index, line in enumerate(structural_lines)
+        if line.startswith("### Option ")
+    ]
     if [heading for _, heading in positions] != list(options):
         errors.append(
             _line_error(
@@ -1193,6 +1232,20 @@ def _validate_option_sections(record: Record) -> list[str]:
             )
         )
         return errors
+
+    prefix_occurrences = _parse_field_occurrences(
+        structural_lines[: positions[0][0]],
+        content_lines[: positions[0][0]],
+        record.start_line + 1,
+    )
+    for label in sorted(OPTION_LOCAL_FIELDS & set(prefix_occurrences)):
+        for occurrence in prefix_occurrences[label]:
+            errors.append(
+                _line_error(
+                    occurrence.start_line,
+                    f"{record.record_id} option-local field {label!r} appears before Option A",
+                )
+            )
 
     for position_index, (start, heading) in enumerate(positions):
         end = (
@@ -1205,6 +1258,16 @@ def _validate_option_sections(record: Record) -> list[str]:
             content_lines[start + 1 : end],
             record.start_line + start + 2,
         )
+        for label in sorted(OPTION_LOCAL_FIELDS & set(occurrences)):
+            if label in options[heading]:
+                continue
+            for occurrence in occurrences[label]:
+                errors.append(
+                    _line_error(
+                        occurrence.start_line,
+                        f"{record.record_id} field {label!r} does not belong under {heading[4:]}",
+                    )
+                )
         for label in sorted(options[heading]):
             values = occurrences.get(label, [])
             if not values:
@@ -1234,7 +1297,6 @@ def _validate_option_sections(record: Record) -> list[str]:
 def _validate_records(
     records: list[Record], active_ids: set[str], active_fingerprints: dict[str, str]
 ) -> tuple[dict[str, Record], list[str]]:
-    """Validate records against their schemas and registry entries."""
     errors: list[str] = []
     by_id: dict[str, Record] = {}
     fingerprints_seen: dict[str, str] = {}
@@ -1336,7 +1398,6 @@ def _validate_records(
                 )
             )
 
-        # An invalid Decision has no defined field set and already reports an error.
         if record_type != "Feature decision" or decision in FEATURE_DECISIONS:
             allowed_fields = set(required_fields)
             if record_type == "Improvement or alternative":
@@ -1589,11 +1650,6 @@ def _validate_cross_references(
 
 
 def _summary_metadata_values(section_lines: list[str]) -> dict[str, str]:
-    """First-occurrence value for each Executive Summary metadata label.
-
-    This is the single reader of report metadata values, shared by structural
-    validation and by :func:`stated_canonical_root`, so the two never drift.
-    """
     values: dict[str, str] = {}
     for line in section_lines:
         for label in REPORT_METADATA_LABELS:
@@ -1611,7 +1667,6 @@ def _is_absolute_canonical_root(value: str) -> bool:
 
 
 def _validate_report_metadata(section_one: str) -> list[str]:
-    """Validate Executive Summary metadata and cross-field rules."""
     errors: list[str] = []
     section_lines = section_one.splitlines()
     values = _summary_metadata_values(section_lines)
@@ -1721,7 +1776,6 @@ def _validate_report_metadata(section_one: str) -> list[str]:
             "Executive Summary Material limitations must explain a Partial or Blocked review"
         )
 
-    # Check relationships only after each value passes its own format rule.
     revalidated_missing = "No — file did not exist"
     revalidated_well_formed = (
         revalidated == "Yes"
@@ -1958,7 +2012,10 @@ def stated_canonical_root(text: str) -> str | None:
 
 
 def canonical_root_error(
-    text: str, expected_root: os.PathLike[str] | str
+    text: str,
+    expected_root: os.PathLike[str] | str,
+    *,
+    expected_is_resolved: bool = False,
 ) -> str | None:
     """Report why the stated canonical root does not match ``expected_root``.
 
@@ -1989,10 +2046,13 @@ def canonical_root_error(
         )
     if stated_normalized == expected_normalized:
         return None
-    try:
-        expected_real = os.path.realpath(expected_absolute)
-    except (OSError, ValueError) as exc:
-        return f"review destination {expected_text!r} cannot be resolved: {exc}"
+    if expected_is_resolved:
+        expected_real = expected_absolute
+    else:
+        try:
+            expected_real = os.path.realpath(expected_absolute)
+        except (OSError, ValueError) as exc:
+            return f"review destination {expected_text!r} cannot be resolved: {exc}"
     expected_real_normalized = os.path.normcase(os.path.normpath(expected_real))
     if stated_normalized != expected_real_normalized:
         return (
@@ -2042,9 +2102,12 @@ def snapshot(path: Path) -> Snapshot:
     The digest is advisory for concurrency; ``commit_bytes`` recomputes starting
     state and fails safe on conflict.
     """
-    canonical = path.expanduser()
-    if not canonical.is_absolute():
-        canonical = Path.cwd() / canonical
+    try:
+        canonical = path.expanduser()
+        if not canonical.is_absolute():
+            canonical = Path.cwd() / canonical
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SnapshotError(f"cannot resolve report path {path}: {exc}") from exc
     try:
         os.lstat(canonical)
     except FileNotFoundError:
@@ -2063,19 +2126,19 @@ def snapshot(path: Path) -> Snapshot:
 def validate_path(
     path: Path, canonical_root: os.PathLike[str] | str | None = None
 ) -> ValidationResult:
-    canonical = path.expanduser()
-    if not canonical.is_absolute():
-        canonical = Path.cwd() / canonical
+    try:
+        canonical = path.expanduser()
+        if not canonical.is_absolute():
+            canonical = Path.cwd() / canonical
+    except (OSError, RuntimeError, ValueError) as exc:
+        return ValidationResult([f"cannot resolve report path {path}: {exc}"], [])
     data, error = _read_path_no_follow(canonical)
     if error:
         return ValidationResult([error], [])
     assert data is not None
     result = validate_bytes(data, source=str(canonical))
     if canonical_root is not None:
-        # Tie three things together: the file must physically be
-        # <canonical-root>/FINDINGS.md, and its stated Canonical root must name
-        # that same repository. Checking only the metadata would accept a report
-        # that lives in a different repository but merely claims this one.
+        # Require both physical placement and matching report metadata.
         expected_file = os.path.join(
             os.path.realpath(os.fspath(canonical_root)), "FINDINGS.md"
         )
@@ -2171,7 +2234,6 @@ def run_self_test() -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Create the report validator's argument parser."""
     parser = argparse.ArgumentParser(
         description="Validate a Super Review FINDINGS.md report."
     )
@@ -2212,10 +2274,51 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_validation_parser(*, prog: str | None = None) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=prog, description="Validate a Super Review FINDINGS.md report."
+    )
+    parser.add_argument("path", type=Path, help="candidate or committed FINDINGS.md")
+    parser.add_argument(
+        "--json", action="store_true", help="emit machine-readable validation output"
+    )
+    parser.add_argument("--quiet", action="store_true", help="suppress success output")
+    parser.add_argument(
+        "--canonical-root",
+        type=Path,
+        default=None,
+        help="also require the report's stated Canonical root to resolve to this directory",
+    )
+    return parser
+
+
+def build_snapshot_parser(*, prog: str | None = None) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        usage="%(prog)s REPOSITORY [--json] [--metadata-only] [--out FILE]",
+        description="Snapshot the exact bytes of REPOSITORY/FINDINGS.md.",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="emit machine-readable snapshot output"
+    )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="omit report content from the output",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="write exact report bytes to a new file outside the repository",
+    )
+    return parser
+
+
 def _snapshot_payload(
     result: Snapshot, *, include_content: bool = True
 ) -> dict[str, object]:
-    """Serialize snapshot metadata and optional report content."""
     payload: dict[str, object] = {
         "status": result.status,
         "digest": result.digest,
@@ -2238,133 +2341,98 @@ def _snapshot_payload(
     return payload
 
 
-def _write_snapshot_bytes(out_path: Path, report_root: Path, data: bytes) -> str | None:
-    """Exclusively create ``out_path`` and write ``data``, refusing targets
-    inside ``report_root``. Returns an error message, or ``None`` on success.
-
-    The output directory is pinned by descriptor before the containment check
-    reruns against its resolved path, and the file is created relative to that
-    descriptor: a concurrent swap of a parent component for a symlink into the
-    reviewed repository cannot redirect the write after the check.
-    """
-    creation_flags = (
-        os.O_WRONLY
-        | os.O_CREAT
-        | os.O_EXCL
-        | getattr(os, "O_NOFOLLOW", 0)
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_BINARY", 0)
+def _snapshot_from_pinned(repository: object, report_name: str) -> Snapshot:
+    """Read the report through the directory identity used for output exclusion."""
+    state = _REPORT_STORE.read_optional_exact(
+        repository,
+        report_name,
+        max_bytes=MAX_REPORT_BYTES,
+        label="report",
     )
-    if os.open in os.supports_dir_fd:
-        directory_flags = (
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
-        )
-        dir_fd = os.open(out_path.parent, directory_flags)
-        try:
-            pinned = os.fstat(dir_fd)
-            resolved_parent = out_path.parent.resolve(strict=True)
-            checked = os.stat(resolved_parent)
-            if getattr(pinned, "st_ino", 0) and (
-                pinned.st_ino != checked.st_ino or pinned.st_dev != checked.st_dev
-            ):
-                return (
-                    f"output directory {out_path.parent} changed while writing; "
-                    "refusing"
-                )
-            if (resolved_parent / out_path.name).is_relative_to(report_root):
-                return f"--out must be outside the reviewed repository ({report_root})"
-            fd = os.open(out_path.name, creation_flags, 0o644, dir_fd=dir_fd)
-        finally:
-            os.close(dir_fd)
-    else:
-        # Windows lacks dir_fd support; the resolved-path pre-check is the
-        # best available guarantee there.
-        fd = os.open(out_path, creation_flags, 0o644)
+    if isinstance(state, _REPORT_STORE.MissingLeaf):
+        return Snapshot(status="missing", digest="MISSING", data=None)
+    return Snapshot(status="present", digest=state.digest, data=state.data)
+
+
+def _write_snapshot_bytes(
+    out_path: Path, repository: object, data: bytes
+) -> str | None:
     try:
-        handle = os.fdopen(fd, "wb")
-    except BaseException:
-        os.close(fd)
-        raise
-    with handle:
-        handle.write(data)
+        _REPORT_STORE.publish_new_exact(
+            out_path,
+            data,
+            forbidden_directory=repository,
+            max_bytes=MAX_REPORT_BYTES,
+        )
+    except (_REPORT_STORE.StoreError, OSError) as exc:
+        return str(exc)
     return None
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Run validation, snapshot, or self-test mode."""
-    args = build_parser().parse_args(argv)
-    if args.self_test:
-        return run_self_test()
-    if args.path is None:
-        print("error: path is required unless --self-test is used", file=sys.stderr)
-        return 2
-
-    if not args.snapshot and (args.metadata_only or args.out is not None):
-        print(
-            "error: --metadata-only and --out require --snapshot",
-            file=sys.stderr,
-        )
-        return 2
-
-    if args.snapshot:
-        if args.canonical_root is not None:
-            print(
-                "error: --canonical-root cannot be combined with --snapshot",
-                file=sys.stderr,
-            )
-            return 2
-        if args.out is not None:
-            # The reviewed tree's sole permitted modification is FINDINGS.md
-            # itself; the snapshot copy must land outside the repository that
-            # the snapshot path lives in.
-            report_path = args.path.expanduser()
-            if not report_path.is_absolute():
-                report_path = Path.cwd() / report_path
-            report_root = report_path.parent.resolve(strict=False)
-            out_path = args.out.expanduser()
+def _run_snapshot(
+    path: Path, *, json_output: bool, metadata_only: bool, out: Path | None
+) -> int:
+    try:
+        report_path = path.expanduser()
+        if not report_path.is_absolute():
+            report_path = Path.cwd() / report_path
+        out_path: Path | None = None
+        if out is not None:
+            out_path = out.expanduser()
             if not out_path.is_absolute():
                 out_path = Path.cwd() / out_path
-            out_resolved = out_path.parent.resolve(strict=False) / out_path.name
-            if out_resolved.is_relative_to(report_root):
-                print(
-                    "error: --out must be outside the reviewed repository "
-                    f"({report_root})",
-                    file=sys.stderr,
-                )
-                return 2
-        try:
-            result = snapshot(args.path)
-        except SnapshotError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 1
-        if args.out is not None and result.data is not None:
-            try:
-                write_error = _write_snapshot_bytes(out_path, report_root, result.data)
-            except OSError as exc:
-                write_error = f"cannot write snapshot bytes to {args.out}: {exc}"
-            if write_error is not None:
-                print(f"error: {write_error}", file=sys.stderr)
-                return 1
-        include_content = not (args.metadata_only or args.out is not None)
-        payload = _snapshot_payload(result, include_content=include_content)
-        if args.out is not None:
-            payload["content_path"] = str(args.out) if result.data is not None else None
-        if args.json:
-            print(json.dumps(payload, indent=2, sort_keys=True))
-        else:
-            print(f"status: {result.status}")
-            print(f"digest: {result.digest}")
-            print(f"size: {payload['size']}")
-            ids = payload["human_block_ids"]
-            assert isinstance(ids, list)
-            if ids:
-                print("human_block_ids: " + ", ".join(str(item) for item in ids))
-            if payload.get("content_path"):
-                print(f"content_path: {payload['content_path']}")
-        return 0
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"error: cannot resolve snapshot path: {exc}", file=sys.stderr)
+        return 1
+    try:
+        with _REPORT_STORE.PinnedDirectory.open(
+            report_path.parent,
+            label="reviewed repository",
+            mutation=False,
+        ) as repository:
+            if out_path is not None:
+                out_resolved = out_path.parent.resolve(strict=False) / out_path.name
+                if out_resolved.is_relative_to(repository.path):
+                    print(
+                        "error: --out must be outside the reviewed repository "
+                        f"({repository.path})",
+                        file=sys.stderr,
+                    )
+                    return 2
+            result = _snapshot_from_pinned(repository, report_path.name)
+            repository.assert_path_binding()
+            if out_path is not None and result.data is not None:
+                write_error = _write_snapshot_bytes(out_path, repository, result.data)
+                if write_error is not None:
+                    print(f"error: {write_error}", file=sys.stderr)
+                    return 1
+    except (_REPORT_STORE.StoreError, OSError, RuntimeError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    include_content = not (metadata_only or out is not None)
+    payload = _snapshot_payload(result, include_content=include_content)
+    if out is not None:
+        payload["content_path"] = str(out) if result.data is not None else None
+    if json_output:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"status: {result.status}")
+        print(f"digest: {result.digest}")
+        print(f"size: {payload['size']}")
+        ids = payload["human_block_ids"]
+        assert isinstance(ids, list)
+        if ids:
+            print("human_block_ids: " + ", ".join(str(item) for item in ids))
+        if payload.get("content_path"):
+            print(f"content_path: {payload['content_path']}")
+    return 0
 
-    result = validate_path(args.path, canonical_root=args.canonical_root)
-    if args.json:
+
+def _run_validation(
+    path: Path, *, json_output: bool, quiet: bool, canonical_root: Path | None
+) -> int:
+    result = validate_path(path, canonical_root=canonical_root)
+    if json_output:
         print(
             json.dumps(
                 {"ok": result.ok, "errors": result.errors, "warnings": result.warnings},
@@ -2382,9 +2450,63 @@ def main(argv: list[str] | None = None) -> int:
             )
             for error in result.errors:
                 print(f"  - {error}", file=sys.stderr)
-        elif not args.quiet:
-            print(f"FINDINGS validation passed: {args.path}")
+        elif not quiet:
+            print(f"FINDINGS validation passed: {path}")
     return 0 if result.ok else 1
+
+
+def validation_main(argv: list[str] | None = None, *, prog: str | None = None) -> int:
+    args = build_validation_parser(prog=prog).parse_args(argv)
+    return _run_validation(
+        args.path,
+        json_output=args.json,
+        quiet=args.quiet,
+        canonical_root=args.canonical_root,
+    )
+
+
+def snapshot_main(
+    path: Path, argv: list[str] | None = None, *, prog: str | None = None
+) -> int:
+    args = build_snapshot_parser(prog=prog).parse_args(argv)
+    return _run_snapshot(
+        path,
+        json_output=args.json,
+        metadata_only=args.metadata_only,
+        out=args.out,
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the direct helper's validation, snapshot, or self-test grammar."""
+    args = build_parser().parse_args(argv)
+    if args.self_test:
+        return run_self_test()
+    if args.path is None:
+        print("error: path is required unless --self-test is used", file=sys.stderr)
+        return 2
+    if not args.snapshot and (args.metadata_only or args.out is not None):
+        print("error: --metadata-only and --out require --snapshot", file=sys.stderr)
+        return 2
+    if args.snapshot:
+        if args.canonical_root is not None:
+            print(
+                "error: --canonical-root cannot be combined with --snapshot",
+                file=sys.stderr,
+            )
+            return 2
+        return _run_snapshot(
+            args.path,
+            json_output=args.json,
+            metadata_only=args.metadata_only,
+            out=args.out,
+        )
+    return _run_validation(
+        args.path,
+        json_output=args.json,
+        quiet=args.quiet,
+        canonical_root=args.canonical_root,
+    )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-"""Dispatch super-review commands to helpers from an explicit skill root."""
-
 from __future__ import annotations
 
 import os
@@ -12,10 +10,22 @@ from super_review_cli.skill_loaders import SkillLoadError, load_helper
 SKILL_ROOT_ENV = "SUPER_REVIEW_SKILL_ROOT"
 
 _HELPER_FILES = {
-    "validate": ("validate_findings.py", "_super_review_cli_validate"),
-    "snapshot": ("validate_findings.py", "_super_review_cli_validate"),
-    "commit": ("commit_findings.py", "_super_review_cli_commit"),
-    "fingerprint": ("finding_fingerprint.py", "_super_review_cli_fingerprint"),
+    "validate": (
+        "validate_findings.py",
+        "_super_review_cli_validate",
+        "validation_main",
+    ),
+    "snapshot": (
+        "validate_findings.py",
+        "_super_review_cli_validate",
+        "snapshot_main",
+    ),
+    "commit": ("commit_findings.py", "_super_review_cli_commit", "main"),
+    "fingerprint": (
+        "finding_fingerprint.py",
+        "_super_review_cli_fingerprint",
+        "main",
+    ),
 }
 
 _HELP = """\
@@ -46,17 +56,22 @@ def _print_help(stream: TextIO) -> None:
 
 
 def _snapshot_target(repo_root: Path) -> Path:
-    """Derive <repo-root>/FINDINGS.md from an absolute existing directory."""
-    requested = repo_root.expanduser()
+    try:
+        requested = repo_root.expanduser()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SkillLoadError(f"cannot expand repo root {repo_root}: {exc}") from exc
     if not requested.is_absolute():
         raise SkillLoadError(f"repo root must be an absolute path, got {repo_root}")
-    try:
-        resolved = requested.resolve(strict=True)
-    except OSError as exc:
-        raise SkillLoadError(f"cannot resolve repo root {repo_root}: {exc}") from exc
-    if not resolved.is_dir():
-        raise SkillLoadError(f"repo root is not a directory: {resolved}")
-    return resolved / "FINDINGS.md"
+    return requested / "FINDINGS.md"
+
+
+def _system_exit_code(exc: SystemExit) -> int:
+    if exc.code is None:
+        return 0
+    if isinstance(exc.code, int):
+        return exc.code
+    print(exc.code, file=sys.stderr)
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -104,25 +119,41 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    filename, module_name = _HELPER_FILES[command]
+    filename, module_name, entry_point = _HELPER_FILES[command]
     try:
         module = load_helper(skill_root, filename, module_name)
+        entry = getattr(module, entry_point, None)
+        if not callable(entry):
+            raise SkillLoadError(
+                f"helper {filename} has no callable {entry_point} entry point"
+            )
         if command == "snapshot":
-            if not rest or rest[0].startswith("-"):
+            if rest and rest[0] in {"-h", "--help"}:
+                target = Path(".")
+                forwarded = rest
+            elif not rest or rest[0].startswith("-"):
                 print(
                     "error: snapshot requires the repository root as its "
                     "first argument",
                     file=sys.stderr,
                 )
                 return 2
-            target = _snapshot_target(Path(rest[0]))
-            forwarded = ["--snapshot", *rest[1:], str(target)]
+            else:
+                target = _snapshot_target(Path(rest[0]))
+                forwarded = rest[1:]
         else:
             forwarded = rest
     except SkillLoadError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    return int(module.main(forwarded))
+    try:
+        if command == "snapshot":
+            return int(entry(target, forwarded, prog="super-review snapshot"))
+        if command == "validate":
+            return int(entry(forwarded, prog="super-review validate"))
+        return int(entry(forwarded))
+    except SystemExit as exc:
+        return _system_exit_code(exc)
 
 
 if __name__ == "__main__":

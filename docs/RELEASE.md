@@ -42,7 +42,10 @@ claude plugin validate src --strict
 
 Copilot and Codex marketplace smoke tests require their respective clients. Add this repository as a marketplace, install `super-review@super-review`, verify the skill source, and invoke the client-specific explicit command before publishing.
 
-For Cursor, confirm `.cursor-plugin/plugin.json` points at `./src/super-review` and the Cursor command adapter, and registers no MCP server (decision D15). The consolidated CLI is validated separately by `make cli-test`.
+For Cursor, confirm `.cursor-plugin/plugin.json` points at `./src/super-review`
+and the Cursor command adapter, and registers no MCP server (decision D15).
+`make release` includes the consolidated CLI gate. Run `make cli-test` directly
+when validating only CLI changes.
 
 ## 5. Build the distributable
 

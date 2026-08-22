@@ -32,7 +32,6 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _normalized_mode(source_mode: int) -> int:
-    """Reduce a source mode to the builder's 0644 or 0755 model."""
     return 0o755 if source_mode & 0o111 else 0o644
 
 

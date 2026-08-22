@@ -47,8 +47,10 @@ repository but wires only the canonical skill and command adapter.
 The package has its own build metadata, lockfile, and CI job. Its runtime uses
 only the Python standard library. `skill_loaders.py` loads each helper from an
 explicit skill root after absolute-path, symlink, and escape checks. Subcommands
-preserve the helper arguments and exit codes. `snapshot` accepts a repository
-root and derives `<repo-root>/FINDINGS.md`. No server runs in the background.
+use command-specific helper entry points and preserve their exit codes. `validate`
+cannot select snapshot or self-test modes. `snapshot` accepts a repository root,
+derives `<repo-root>/FINDINGS.md`, pins that directory before reading, and exposes
+only snapshot options. No server runs in the background.
 
 ## Instruction loading
 
@@ -67,11 +69,13 @@ A run follows this state model:
 5. Canonicalize current records and preserve or retire IDs according to fingerprints.
 6. Generate a complete candidate outside the reviewed repository.
 7. Validate the candidate's exact bytes.
-8. Recheck the live target digest and protected human blocks.
-9. Stage the same validated bytes beside the target and atomically replace it.
+8. Pin the repository directory, then recheck the live target digest and
+   protected human blocks through that descriptor.
+9. Stage the same validated bytes in a pinned private directory and publish
+   through descriptors. Missing targets use atomic no-replace hard links.
+   Existing targets use one atomic exchange so the displaced inode remains
+   available for verification or conflict recovery.
 10. Reread and validate the committed report.
-
-A concurrent change causes a conflict, not a forced overwrite.
 
 ## Canonical record model
 
@@ -90,7 +94,25 @@ Summary tables, roadmap items, and cross-references point to canonical IDs inste
 
 The target repository is untrusted. Runtime helpers are invoked from the absolute loaded skill root with isolated Python mode. Sibling modules are loaded by canonical file path after regular-file and no-symlink checks. The reviewed repository's current working directory and import path are not trusted resolution sources.
 
-`commit_findings.py` exposes a single write core, `commit_bytes`, that validates and writes an immutable byte sequence under digest concurrency and annotation preservation. The path CLI reads the candidate once without following its final component, applies path-only location and hard-link checks, then delegates to `commit_bytes`. `validate_findings.snapshot` provides an exact-byte read of an existing report (or `MISSING`) for prior-report revalidation and concurrency bookkeeping; the snapshot digest is advisory because commit recomputes starting state.
+`commit_findings.py` exposes a single write core, `commit_bytes`, that validates an
+immutable byte sequence under digest concurrency and annotation preservation.
+`report_store.py` owns pinned directory identity, advisory locking, stable target
+reads, staging, publication, cleanup, directory sync, and final inode and byte
+verification. The path front end reads the candidate once without following its
+final component, applies location and hard-link checks, then delegates those
+captured bytes. Snapshot `--out` uses the same complete-stage and atomic-link
+publication path. Existing-report commits atomically exchange the staged and
+current names, then verify the displaced inode. A failed post-exchange check does
+not trigger another pathname exchange. The private directory is preserved as a
+recovery quarantine, avoiding a second source-name race. Platforms without the
+required descriptor-relative, no-replace, or exchange primitives fail before
+publication.
+`validate_findings.snapshot` provides an exact-byte read of an existing report,
+or `MISSING`, for prior-report revalidation and concurrency bookkeeping.
+
+Portable standard-library APIs cannot identify every privileged bind-mount alias
+to a repository subdirectory. Callers must not choose snapshot output through
+such an alias.
 
 ## Build model
 

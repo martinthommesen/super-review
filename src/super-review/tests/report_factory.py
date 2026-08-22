@@ -397,7 +397,6 @@ def make_feature(
 
 
 def make_positive(*, record_id: str = "POS-001") -> CanonicalRecord:
-    """Build the positive-pattern fixture."""
     category = "POS"
     record_type = "Positive pattern"
     component = "security/authorization"
@@ -447,7 +446,6 @@ def make_retired_entry(
     replacement_ids: tuple[str, ...] = (),
     seed: str = "retired-fixture",
 ) -> dict:
-    """Return a well-formed retired-registry entry with a seed-unique fingerprint."""
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
     return {
         "fingerprint": f"sha256:{digest}",
@@ -466,7 +464,6 @@ def build_report(
     completion: str = "Complete",
     material_limitations: str = "None",
 ) -> str:
-    """Build a complete report fixture."""
     records = records or []
     retired = retired or {}
     active = {record.record_id: record.fingerprint for record in records}

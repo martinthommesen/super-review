@@ -214,22 +214,47 @@ Immediately before replacement:
 3. Compare it with the digest against which the candidate was generated.
 4. Re-extract protected blocks and verify that the candidate preserves the current versions exactly.
 
+Snapshot `--out` stages and syncs the complete payload before atomically linking
+the requested new name. It fails without a final file when descriptor-relative
+or hard-link publication is unavailable.
+
 If the current report is too large or too malformed to process safely, record the limitation and complete with `Partial` or `Blocked` status rather than streaming its full content into working context.
 
 If the digest changed, do not overwrite the file. The change may contain human decisions, another review, remediations, or new evidence. Reread the latest report, revalidate the changed claims and every affected derived section, merge the latest protected blocks, regenerate the candidate, rerun validation, and use the new digest. Repeat until a stable digest is obtained.
 
-Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` when Python 3 is available. The path must resolve from the loaded skill package, never from the target repository. It validates the candidate, requires the candidate's stated `Canonical root` to be absolute and match the commit destination without dereferencing the report-controlled path, obtains an out-of-repository advisory lock, verifies the expected digest, verifies protected blocks, writes a same-directory temporary file, flushes it, rereads the target immediately before replacement, atomically replaces the target, flushes the directory where supported, and verifies the final digest. It refuses symbolic-link targets, digest conflicts, relative canonical roots, and any candidate whose stated canonical root belongs to a different repository. The path CLI is a thin front on `commit_bytes`, the single write core.
+Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` when Python 3 is
+available. The path must resolve from the loaded skill package, never from the
+target repository. It validates the candidate, pins the repository directory,
+requires the stated `Canonical root` to match that pinned destination without
+dereferencing report-controlled text, obtains an out-of-repository advisory
+lock, verifies the expected digest and protected blocks, stages and flushes the
+exact candidate bytes, publishes through the pinned descriptor, syncs the
+directory, and verifies the final inode, bytes, and digest. Staging occurs in a
+pinned private directory. A missing target is created only by an atomic
+no-replace hard link from the complete staged file. An existing target is
+atomically exchanged with the staged candidate. The displaced inode is verified
+against the digest-gated state. A conflict after exchange preserves the private
+staging directory as a recovery quarantine. The helper does not attempt a second
+pathname exchange whose source could race its authorization check. When
+descriptor-relative publication, descriptor-based mode setting, directory sync,
+hard-link creation, or atomic exchange is unavailable, the helper fails without
+publishing a new report. It refuses symbolic-link targets, digest conflicts,
+relative canonical roots, and candidates for another repository. The path CLI
+is a thin front on `commit_bytes`, the single policy entry point.
 
 The canonical-root check prevents a report generated for one repository from
 being written to another. This can happen when concurrent reviews share a
 candidate path. Give each candidate the target's absolute `Canonical root` and
 use a distinct out-of-repository path for each target.
 
-An atomic rename prevents partial files but not lost updates. The digest check
-and advisory lock serialize writers that use the helper. A separate editor or
-tool can still race the replacement. Reads immediately before and after the
-write detect that race when possible. Never bypass the digest check. If changes
-cannot be reconciled, leave the file intact and report the conflict.
+The digest check and advisory lock serialize writers that use the helper. Atomic
+exchange also preserves the displaced inode during the final publication window.
+If post-exchange verification fails, the helper reports a conflict and preserves
+the private leaf at the reported recovery path. It leaves the canonical path as
+observed instead of risking attacker-selected bytes through a second exchange. A
+separate editor can still change the file after a successful commit has returned.
+Never bypass the digest check. Reconcile any preserved recovery data before
+retrying.
 
 ## Post-write verification
 

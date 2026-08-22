@@ -5,6 +5,7 @@ import errno
 import hashlib
 import os
 import random
+import stat
 import tempfile
 import unittest
 from pathlib import Path
@@ -62,6 +63,24 @@ class CommitFindingsTests(unittest.TestCase):
         with self.assertRaisesRegex(cf.CommitError, "symbolic-link candidate"):
             self.commit()
 
+    def test_repository_symlink_loop_is_reported_without_traceback(self) -> None:
+        self.write_candidate()
+        first = self.base / "loop-a"
+        second = self.base / "loop-b"
+        try:
+            first.symlink_to(second)
+            second.symlink_to(first)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"symlinks unavailable: {exc}")
+        with self.assertRaisesRegex(cf.CommitError, "cannot resolve repository root"):
+            cf.commit(
+                repo_root=first,
+                candidate_path=self.candidate,
+                expected_digest="MISSING",
+                lock_timeout=1.0,
+                dry_run=False,
+            )
+
     def test_target_symlink_is_rejected(self) -> None:
         self.write_candidate()
         external = self.base / "external.md"
@@ -113,14 +132,16 @@ class CommitFindingsTests(unittest.TestCase):
             )
             .encode("utf-8")
         )
-        original_write_temp = cf._write_temp
+        original_stage = cf._REPORT_STORE._stage_exact
 
-        def stage_then_change(root: Path, candidate: bytes, mode: int | None) -> Path:
-            staged = original_write_temp(root, candidate, mode)
+        def stage_then_change(directory, payload, *, mode: int, prefix: str):
+            staged = original_stage(directory, payload, mode=mode, prefix=prefix)
             target.write_bytes(concurrent)
             return staged
 
-        with mock.patch.object(cf, "_write_temp", side_effect=stage_then_change):
+        with mock.patch.object(
+            cf._REPORT_STORE, "_stage_exact", side_effect=stage_then_change
+        ):
             with self.assertRaises(cf.ConflictError):
                 self.commit(expected=digest(current))
 
@@ -354,115 +375,299 @@ class CommitFindingsTests(unittest.TestCase):
                     dry_run=False,
                 )
 
-    def test_commit_works_without_os_fchmod(self) -> None:
-        """Windows before Python 3.13 lacks os.fchmod; chmod fallback must hold."""
-        expected_bytes = self.write_candidate()
+    def test_commit_fails_closed_without_descriptor_mode_setting(self) -> None:
+        self.write_candidate()
         with mock.patch.object(cf.os, "fchmod", None):
-            result = self.commit()
-        self.assertEqual(result["status"], "committed")
-        target = self.repo / "FINDINGS.md"
-        self.assertEqual(target.read_bytes(), expected_bytes)
-        self.assertEqual(os.stat(target).st_mode & 0o777, 0o644)
+            with self.assertRaises(cf._REPORT_STORE.SafePublicationUnavailable):
+                self.commit()
+        self.assertFalse((self.repo / "FINDINGS.md").exists())
 
-    def test_missing_target_creation_without_hardlink_support(self) -> None:
-        expected_bytes = self.write_candidate()
+    def test_commit_fails_closed_without_descriptor_operations(self) -> None:
+        self.write_candidate()
+        with mock.patch.object(
+            cf._REPORT_STORE,
+            "_DESCRIPTOR_OPERATIONS_AVAILABLE",
+            False,
+        ):
+            with self.assertRaises(cf._REPORT_STORE.SafePublicationUnavailable):
+                self.commit()
+        self.assertFalse((self.repo / "FINDINGS.md").exists())
+
+    def test_missing_target_fails_closed_without_hardlink_support(self) -> None:
+        self.write_candidate()
         with mock.patch.object(
             cf.os, "link", side_effect=OSError(errno.EPERM, "hard links unsupported")
         ):
-            result = self.commit()
-        self.assertEqual(result["status"], "committed")
-        target = self.repo / "FINDINGS.md"
-        self.assertEqual(target.read_bytes(), expected_bytes)
-        self.assertEqual(os.stat(target).st_mode & 0o777, 0o644)
-
-    def test_fallback_failure_leaves_no_partial_report(self) -> None:
-        self.write_candidate()
-        target = self.repo / "FINDINGS.md"
-        with (
-            mock.patch.object(
-                cf.os,
-                "link",
-                side_effect=OSError(errno.EPERM, "hard links unsupported"),
-            ),
-            mock.patch.object(
-                cf.os, "replace", side_effect=OSError(errno.EIO, "device error")
-            ),
-        ):
-            with self.assertRaises(OSError):
+            with self.assertRaises(cf._REPORT_STORE.SafePublicationUnavailable):
                 self.commit()
-        # The placeholder is cleaned up; the visible path never held a
-        # partially written candidate.
-        self.assertFalse(target.exists())
+        self.assertFalse((self.repo / "FINDINGS.md").exists())
 
-    def test_fallback_setup_failure_leaves_no_placeholder(self) -> None:
+    def test_failed_staging_leaves_no_partial_report(self) -> None:
         self.write_candidate()
         target = self.repo / "FINDINGS.md"
-        real_set_mode = cf._set_mode
 
-        def failing_set_mode(fd: int, path, mode: int) -> None:
-            # Fail only the placeholder's mode step; _write_temp still works.
-            if path.name == "FINDINGS.md":
-                raise OSError(errno.EPERM, "chmod refused")
-            real_set_mode(fd, path, mode)
-
-        with (
-            mock.patch.object(
-                cf.os,
-                "link",
-                side_effect=OSError(errno.EPERM, "hard links unsupported"),
-            ),
-            mock.patch.object(cf, "_set_mode", side_effect=failing_set_mode),
-        ):
-            with self.assertRaises(OSError):
-                self.commit()
-        # A failure between placeholder creation and replacement must not
-        # orphan an empty FINDINGS.md that wedges later creation commits.
-        self.assertFalse(target.exists())
-        result = self.commit()
-        self.assertEqual(result["status"], "committed")
-
-    def test_fallback_cleanup_spares_foreign_replacement(self) -> None:
-        self.write_candidate()
-        target = self.repo / "FINDINGS.md"
-        foreign = b"foreign writer content\n"
-        foreign_source = self.base / "foreign.md"
-
-        def swap_then_fail(src, dst, *args, **kwargs):
-            foreign_source.write_bytes(foreign)
-            os.rename(foreign_source, target)
+        def partial_write(fd: int, data: bytes) -> None:
+            os.write(fd, data[:10])
             raise OSError(errno.EIO, "device error")
 
-        with (
-            mock.patch.object(
-                cf.os,
-                "link",
-                side_effect=OSError(errno.EPERM, "hard links unsupported"),
-            ),
-            mock.patch.object(cf.os, "replace", side_effect=swap_then_fail),
+        with mock.patch.object(
+            cf._REPORT_STORE, "_write_all", side_effect=partial_write
         ):
             with self.assertRaises(OSError):
                 self.commit()
-        # The identity-guarded cleanup must not delete the other writer's file.
-        self.assertEqual(target.read_bytes(), foreign)
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self.repo.glob(".FINDINGS.md.super-review.*.stage")), [])
 
-    def test_fallback_creation_detects_concurrent_writer(self) -> None:
+    def test_repository_root_swap_cannot_redirect_publication(self) -> None:
         self.write_candidate()
-        target = self.repo / "FINDINGS.md"
-        concurrent = rf.build_report().replace(
-            "Material limitations: None",
-            "Material limitations: Concurrent writer created this report.",
-            1,
-        )
+        moved = self.base / "moved-repository"
+        outside = self.base / "outside"
+        outside.mkdir()
+        original_link = cf._REPORT_STORE.PinnedDirectory.link_from
 
-        def write_then_refuse(src, dst, *args, **kwargs):
-            """Simulate a concurrent write before hard-link creation fails."""
-            target.write_text(concurrent, encoding="utf-8")
-            raise OSError(errno.EPERM, "hard links unsupported")
+        probe = self.base / "symlink-probe"
+        try:
+            probe.symlink_to(outside)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"symlinks unavailable: {exc}")
+        probe.unlink()
 
-        with mock.patch.object(cf.os, "link", side_effect=write_then_refuse):
+        def swap_then_link(
+            directory, source_directory, source: str, destination: str
+        ) -> None:
+            os.rename(self.repo, moved)
+            os.symlink(outside, self.repo)
+            original_link(directory, source_directory, source, destination)
+
+        with mock.patch.object(
+            cf._REPORT_STORE.PinnedDirectory,
+            "link_from",
+            autospec=True,
+            side_effect=swap_then_link,
+        ):
             with self.assertRaises(cf.ConflictError):
                 self.commit()
-        self.assertEqual(target.read_text(encoding="utf-8"), concurrent)
+        self.assertFalse((outside / "FINDINGS.md").exists())
+        self.assertFalse((moved / "FINDINGS.md").exists())
+
+    def test_foreign_replacement_after_exchange_preserves_displaced_target(
+        self,
+    ) -> None:
+        current = self.report().encode("utf-8")
+        target = self.repo / "FINDINGS.md"
+        target.write_bytes(current)
+        self.write_candidate(
+            self.report().replace(
+                "Material limitations: None",
+                "Material limitations: Candidate update.",
+                1,
+            )
+        )
+        foreign = b"foreign bytes\n"
+        original_exchange = cf._REPORT_STORE.PinnedDirectory.exchange_with
+        injected = False
+
+        def exchange_then_foreign(
+            directory, source_directory, source: str, destination: str
+        ) -> None:
+            nonlocal injected
+            original_exchange(directory, source_directory, source, destination)
+            if injected:
+                return
+            injected = True
+            directory.unlink_leaf(destination)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            fd = directory.open_leaf(destination, flags, 0o644)
+            try:
+                os.write(fd, foreign)
+            finally:
+                os.close(fd)
+
+        with mock.patch.object(
+            cf._REPORT_STORE.PinnedDirectory,
+            "exchange_with",
+            autospec=True,
+            side_effect=exchange_then_foreign,
+        ):
+            with self.assertRaises(cf.ConflictError):
+                self.commit(expected=digest(current))
+        self.assertEqual(target.read_bytes(), foreign)
+        recovery = list(self.repo.glob(".FINDINGS.md.super-review.*.stage/payload"))
+        self.assertEqual(len(recovery), 1)
+        self.assertEqual(recovery[0].read_bytes(), current)
+
+    def test_target_change_at_exchange_is_quarantined_without_losing_blocks(
+        self,
+    ) -> None:
+        current = self.report().encode("utf-8")
+        target = self.repo / "FINDINGS.md"
+        target.write_bytes(current)
+        candidate = self.write_candidate(
+            self.report().replace(
+                "Material limitations: None",
+                "Material limitations: Candidate update.",
+                1,
+            )
+        )
+        concurrent = rf.add_global_human_block(
+            self.report(), "Concurrent human decision.\n"
+        ).encode("utf-8")
+        original_exchange = cf._REPORT_STORE.PinnedDirectory.exchange_with
+        injected = False
+
+        def change_then_exchange(
+            directory, source_directory, source: str, destination: str
+        ) -> None:
+            nonlocal injected
+            if not injected:
+                injected = True
+                target.write_bytes(concurrent)
+            original_exchange(directory, source_directory, source, destination)
+
+        with mock.patch.object(
+            cf._REPORT_STORE.PinnedDirectory,
+            "exchange_with",
+            autospec=True,
+            side_effect=change_then_exchange,
+        ):
+            with self.assertRaises(cf.ConflictError):
+                self.commit(expected=digest(current))
+        self.assertEqual(target.read_bytes(), candidate)
+        recovery = list(self.repo.glob(".FINDINGS.md.super-review.*.stage/payload"))
+        self.assertEqual(len(recovery), 1)
+        self.assertEqual(recovery[0].read_bytes(), concurrent)
+
+    def test_replaced_displaced_leaf_is_never_promoted_by_recovery(self) -> None:
+        current = self.report().encode("utf-8")
+        target = self.repo / "FINDINGS.md"
+        target.write_bytes(current)
+        candidate = self.write_candidate(
+            self.report().replace(
+                "Material limitations: None",
+                "Material limitations: Candidate update.",
+                1,
+            )
+        )
+        attacker = b"X" * len(current)
+        original_exchange = cf._REPORT_STORE.PinnedDirectory.exchange_with
+        injected = False
+        exchange_calls = 0
+
+        def exchange_then_replace_source(
+            directory, source_directory, source: str, destination: str
+        ) -> None:
+            nonlocal exchange_calls, injected
+            exchange_calls += 1
+            original_exchange(directory, source_directory, source, destination)
+            if injected:
+                return
+            injected = True
+            source_directory.unlink_leaf(source)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            fd = source_directory.open_leaf(source, flags, 0o600)
+            try:
+                os.write(fd, attacker)
+            finally:
+                os.close(fd)
+
+        with mock.patch.object(
+            cf._REPORT_STORE.PinnedDirectory,
+            "exchange_with",
+            autospec=True,
+            side_effect=exchange_then_replace_source,
+        ):
+            with self.assertRaisesRegex(cf.ConflictError, "exchange was not reversed"):
+                self.commit(expected=digest(current))
+        self.assertEqual(exchange_calls, 1)
+        self.assertEqual(target.read_bytes(), candidate)
+        recovery = list(self.repo.glob(".FINDINGS.md.super-review.*.stage/payload"))
+        self.assertEqual(len(recovery), 1)
+        self.assertEqual(recovery[0].read_bytes(), attacker)
+
+    def test_replaced_staging_leaf_cannot_reach_existing_target(self) -> None:
+        current = self.report().encode("utf-8")
+        target = self.repo / "FINDINGS.md"
+        target.write_bytes(current)
+        self.write_candidate(
+            self.report().replace(
+                "Material limitations: None",
+                "Material limitations: Candidate update.",
+                1,
+            )
+        )
+        original_stage = cf._REPORT_STORE._stage_exact
+
+        def stage_then_replace(directory, payload, *, mode: int, prefix: str):
+            staged = original_stage(directory, payload, mode=mode, prefix=prefix)
+            staged.directory.unlink_leaf(staged.name)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            fd = staged.directory.open_leaf(staged.name, flags, 0o600)
+            try:
+                os.write(fd, b"X" * len(payload.data))
+            finally:
+                os.close(fd)
+            return staged
+
+        with mock.patch.object(
+            cf._REPORT_STORE, "_stage_exact", side_effect=stage_then_replace
+        ):
+            with self.assertRaises(cf.ConflictError):
+                self.commit(expected=digest(current))
+        self.assertEqual(target.read_bytes(), current)
+        recovery = list(self.repo.glob(".FINDINGS.md.super-review.*.stage/payload"))
+        self.assertEqual(len(recovery), 1)
+        self.assertEqual(
+            recovery[0].read_bytes(), b"X" * len(self.candidate.read_bytes())
+        )
+
+    def test_existing_target_fails_closed_without_atomic_exchange(self) -> None:
+        current = self.report().encode("utf-8")
+        target = self.repo / "FINDINGS.md"
+        target.write_bytes(current)
+        self.write_candidate(
+            self.report().replace(
+                "Material limitations: None",
+                "Material limitations: Candidate update.",
+                1,
+            )
+        )
+        unavailable = cf._REPORT_STORE.SafePublicationUnavailable(
+            "atomic exchange unavailable"
+        )
+        with mock.patch.object(
+            cf._REPORT_STORE, "_rename_exchange", side_effect=unavailable
+        ):
+            with self.assertRaises(cf._REPORT_STORE.SafePublicationUnavailable):
+                self.commit(expected=digest(current))
+        self.assertEqual(target.read_bytes(), current)
+        self.assertEqual(list(self.repo.glob(".FINDINGS.md.super-review.*.stage")), [])
+
+    def test_existing_target_mode_is_preserved(self) -> None:
+        current = self.report().encode("utf-8")
+        target = self.repo / "FINDINGS.md"
+        target.write_bytes(current)
+        target.chmod(0o600)
+        self.write_candidate(
+            self.report().replace(
+                "Material limitations: None",
+                "Material limitations: Candidate update.",
+                1,
+            )
+        )
+        self.commit(expected=digest(current))
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+
+    def test_advisory_lock_timeout_closes_its_handle(self) -> None:
+        if os.name == "nt":
+            self.skipTest("POSIX flock test")
+        identity = cf._REPORT_STORE.FileIdentity.from_stat(self.repo.stat())
+        lock = cf._REPORT_STORE.AdvisoryLock(identity, self.repo, 0.0)
+        with mock.patch("fcntl.flock", side_effect=BlockingIOError):
+            with self.assertRaisesRegex(
+                cf._REPORT_STORE.StoreConflictError, "timed out"
+            ):
+                lock.__enter__()
+        self.assertIsNone(lock.handle)
 
     def test_commit_accepts_annotation_containing_fence_marker(self) -> None:
         first = rf.add_global_human_block(self.report(), "Decision.\n```\nrationale\n")
@@ -490,7 +695,6 @@ class CommitFindingsTests(unittest.TestCase):
             self.commit(expected=digest(current))
 
     def test_writer_and_validator_share_one_scanner(self) -> None:
-        """Differential guard: the writer must hold no structure parser of its own."""
         self.assertFalse(hasattr(cf, "FENCE_OPEN_BYTES_RE"))
         rng = random.Random(0)
         atoms = [
@@ -525,7 +729,6 @@ class CommitFindingsTests(unittest.TestCase):
                 self.assertEqual(cf._parse_human_blocks_bytes(data), expected)
 
     def test_hard_linked_target_alone_is_not_refused(self) -> None:
-        """Atomic replace may detach a hard-linked target pathname safely."""
         current = self.report().encode("utf-8")
         target = self.repo / "FINDINGS.md"
         target.write_bytes(current)
@@ -542,7 +745,6 @@ class CommitFindingsTests(unittest.TestCase):
         payload = self.write_candidate(candidate)
         self.commit(expected=digest(current))
         self.assertEqual(target.read_bytes(), payload)
-        # The alias still holds the previous inode contents after replace.
         self.assertEqual(alias.read_bytes(), current)
 
 

@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import ModuleType
 from unittest import mock
 
 ROOT = Path(__file__).resolve(strict=True).parents[2]
@@ -28,7 +29,6 @@ from super_review_cli.skill_loaders import SkillLoadError, load_helper  # noqa: 
 
 
 def run_cli(*argv: str) -> tuple[int, str, str]:
-    """Run the CLI and capture both output streams."""
     stdout = io.StringIO()
     stderr = io.StringIO()
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
@@ -37,7 +37,6 @@ def run_cli(*argv: str) -> tuple[int, str, str]:
 
 
 def with_root(*argv: str) -> tuple[int, str, str]:
-    """Run the CLI with the test skill root."""
     return run_cli("--skill-root", str(SKILL_ROOT), *argv)
 
 
@@ -53,6 +52,45 @@ class SkillLoaderTests(unittest.TestCase):
                 Path("src/super-review"), "validate_findings.py", "_cli_test_rel"
             )
 
+    def test_import_failures_restore_module_state(self) -> None:
+        cases = {
+            "oserror": "raise OSError('broken filesystem')\n",
+            "importerror": "raise ImportError('missing dependency')\n",
+            "syntaxerror": "def broken(:\n",
+            "runtimeerror": "raise RuntimeError('broken helper')\n",
+            "systemexit": "raise SystemExit(7)\n",
+        }
+        for name, source in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "SKILL.md").write_text("fixture\n", encoding="utf-8")
+                scripts = root / "scripts"
+                scripts.mkdir()
+                (scripts / "helper.py").write_text(source, encoding="utf-8")
+                module_name = f"_cli_failed_import_{name}"
+                with self.assertRaises(SkillLoadError):
+                    load_helper(root, "helper.py", module_name)
+                self.assertNotIn(module_name, sys.modules)
+
+    def test_import_failure_restores_existing_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "SKILL.md").write_text("fixture\n", encoding="utf-8")
+            scripts = root / "scripts"
+            scripts.mkdir()
+            (scripts / "helper.py").write_text(
+                "raise RuntimeError('broken helper')\n", encoding="utf-8"
+            )
+            module_name = "_cli_existing_module"
+            previous = ModuleType(module_name)
+            sys.modules[module_name] = previous
+            try:
+                with self.assertRaises(SkillLoadError):
+                    load_helper(root, "helper.py", module_name)
+                self.assertIs(sys.modules[module_name], previous)
+            finally:
+                sys.modules.pop(module_name, None)
+
 
 class CliTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -65,7 +103,6 @@ class CliTests(unittest.TestCase):
         self.temp.cleanup()
 
     def write_candidate(self, text: str | None = None) -> Path:
-        """Write a candidate report outside the test repository."""
         candidate = self.base / "candidate.md"
         candidate.write_text(
             text
@@ -96,9 +133,6 @@ class CliTests(unittest.TestCase):
         self.assertIn("absolute", err)
 
     def test_skill_root_resolution_oserror_maps_to_exit_2(self) -> None:
-        # A root whose strict resolution fails after the lstat checks (removed
-        # in between, unreadable parent, dead network mount) must appear as
-        # the documented usage exit code, never as a traceback.
         with mock.patch.object(
             Path, "resolve", side_effect=OSError("transport endpoint disconnected")
         ):
@@ -108,10 +142,17 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("cannot resolve skill root", err)
 
+    def test_skill_root_expand_error_maps_to_exit_2(self) -> None:
+        with mock.patch.object(
+            Path, "expanduser", side_effect=RuntimeError("unknown home")
+        ):
+            code, _, err = run_cli(
+                "--skill-root", str(SKILL_ROOT), "validate", "irrelevant"
+            )
+        self.assertEqual(code, 2)
+        self.assertIn("cannot expand skill root", err)
+
     def test_scripts_directory_resolution_oserror_maps_to_exit_2(self) -> None:
-        # The blanket mock above trips on the first resolve (the skill root);
-        # this one fails only the scripts-directory resolution so the later
-        # wrapper is exercised too.
         real_resolve = Path.resolve
 
         def failing_resolve(target: Path, strict: bool = False) -> Path:
@@ -134,6 +175,44 @@ class CliTests(unittest.TestCase):
         invalid.write_text("not a report\n", encoding="utf-8")
         code, _, err = with_root("validate", str(invalid))
         self.assertEqual(code, 1, err)
+
+    def test_validate_cannot_select_snapshot_or_self_test_modes(self) -> None:
+        arbitrary = self.base / "arbitrary.txt"
+        arbitrary.write_text("private bytes\n", encoding="utf-8")
+        code, out, err = with_root("validate", "--snapshot", "--json", str(arbitrary))
+        self.assertEqual(code, 2, (out, err))
+        self.assertNotIn("private bytes", out)
+        code, _, _ = with_root("validate", "--self-test")
+        self.assertEqual(code, 2)
+
+    def test_each_subcommand_help_returns_zero(self) -> None:
+        for command in ("validate", "snapshot", "commit", "fingerprint"):
+            with self.subTest(command=command):
+                code, out, err = with_root(command, "--help")
+                self.assertEqual(code, 0, (out, err))
+                self.assertIn("usage:", out)
+
+    def test_snapshot_rejects_internal_self_test_mode(self) -> None:
+        code, _, err = with_root("snapshot", str(self.repo), "--self-test")
+        self.assertEqual(code, 2, err)
+
+    def test_missing_transitive_helper_maps_to_load_error(self) -> None:
+        copied = self.base / "skill"
+        shutil.copytree(SKILL_ROOT, copied)
+        (copied / "scripts" / "report_store.py").unlink()
+        names = (
+            "_super_review_finding_fingerprint",
+            "_super_review_report_store",
+        )
+        before = {name: sys.modules.get(name) for name in names}
+        code, _, err = run_cli("--skill-root", str(copied), "validate", "irrelevant")
+        self.assertEqual(code, 2)
+        self.assertIn("cannot load helper", err)
+        for name, previous in before.items():
+            if previous is None:
+                self.assertNotIn(name, sys.modules)
+            else:
+                self.assertIs(sys.modules.get(name), previous)
 
     def test_validate_canonical_root_mismatch(self) -> None:
         other = self.base / "other"
@@ -177,8 +256,20 @@ class CliTests(unittest.TestCase):
         plain_file = self.base / "file.txt"
         plain_file.write_text("x", encoding="utf-8")
         code, _, err = with_root("snapshot", str(plain_file))
-        self.assertEqual(code, 2)
+        self.assertEqual(code, 1)
         self.assertIn("not a directory", err)
+
+    def test_snapshot_reports_repository_symlink_loop(self) -> None:
+        first = self.base / "loop-a"
+        second = self.base / "loop-b"
+        try:
+            first.symlink_to(second)
+            second.symlink_to(first)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"symlinks unavailable: {exc}")
+        code, _, err = with_root("snapshot", str(first))
+        self.assertEqual(code, 1)
+        self.assertIn("cannot resolve reviewed repository", err)
 
     def test_commit_round_trip_conflict_and_wrong_repo(self) -> None:
         candidate = self.write_candidate()
@@ -260,7 +351,6 @@ class CliTests(unittest.TestCase):
 
 class ConsoleEntrySmokeTests(unittest.TestCase):
     def test_console_entry_offline_smoke(self) -> None:
-        """Run the installed entry point offline (the CI job syncs first)."""
         if shutil.which("uv") is None:
             self.skipTest("uv executable not on PATH")
         completed = subprocess.run(

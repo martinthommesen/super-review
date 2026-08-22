@@ -24,8 +24,8 @@ From this repository:
 
 ```bash
 cd cli
-uv sync --frozen
-uv run super-review --help
+uv sync --locked
+uv run --locked super-review --help
 ```
 
 As a tool:
@@ -37,7 +37,7 @@ super-review --skill-root /path/to/super-review/src/super-review validate --help
 
 ## Commands
 
-Each command passes its remaining arguments to the helper. Put `-h` after the
+Each command invokes a command-specific helper entry point. Put `-h` after the
 command to see its options. Exit codes pass through unchanged. `validate` uses
 0 for success, 1 for an invalid report, and 2 for usage errors. `commit` uses 0
 for success, 2 for validation, 3 for conflicts, and 4 for I/O errors.
@@ -63,7 +63,14 @@ super-review --skill-root "$SKILL_ROOT" fingerprint \
 ```
 
 `snapshot` accepts a repository root, not a file path. It always reads
-`<repo-root>/FINDINGS.md`.
+`<repo-root>/FINDINGS.md`. Validator-internal snapshot and self-test switches
+are not accepted by `validate`. The helper pins the repository directory before
+reading the report.
+
+Snapshot output and a first commit require descriptor-relative, atomic
+no-replace filesystem support. Updating an existing report also requires atomic
+name exchange. Unsupported platforms or filesystems fail without publishing a
+new report.
 
 ## Development
 

@@ -17,8 +17,7 @@ indent_size = 2
 [Makefile]
 indent_style = tab
 
-# Archival provenance file: byte-exact and deliberately without a trailing
-# newline (sha256-pinned; see docs/PROVENANCE.md and tests/test_repository.py).
+# This checksum-pinned provenance file intentionally has no trailing newline.
 [docs/ORIGINAL_REVIEW_PROMPT.md]
 insert_final_newline = false
 trim_trailing_whitespace = false

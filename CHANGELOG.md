@@ -24,16 +24,42 @@ All notable changes to `super-review` are recorded here.
 - Decision D15 replaced the MCP companion with the CLI. The repository no longer
   registers a server that host automation or injected instructions can call.
 
+### Fixed
+
+- Commit and CLI snapshot operations now stay bound to pinned directory
+  descriptors. Candidates are prepared in private pinned directories. Existing
+  targets use one atomic exchange with displaced-inode verification and conflict
+  recovery, while missing targets use atomic no-replace hard links. Failed
+  post-exchange checks preserve the private recovery leaf and never attempt a
+  second pathname exchange. Publication verifies the final inode and exact bytes
+  and rejects repository or output-directory rebinding.
+- The consolidated CLI invokes command-specific validator entry points. `validate`
+  can no longer select snapshot or self-test modes, every subcommand has predictable
+  help exit behavior, and failed helper imports restore reserved `sys.modules`
+  entries.
+- Improvement option fields are checked against their actual Option A through D
+  range. Shared fields remain valid in every range that defines them.
+- Registry replacement chains use linear reverse terminal pruning, avoiding
+  quadratic validation time for large valid registries.
+- Verification commands use locked dependency state. Tests suppress project
+  bytecode, cleanup and tree checks prune dependency environments, and the
+  repository suite checks root entrypoint modes. Cleanup stays bound to opened
+  directory descriptors and refuses platforms without symlink-safe removal.
+
 ### Changed
 
 - Reference files now match the validator's field values, option labels, registry
   placement, protected-block IDs, explanation separators, and digest format.
 - Protected annotations remain byte-exact but grant no authority to run commands,
   use the network, change scope, or override instructions.
-- The advisory lock serializes writers that use the helper. Final reads detect a
-  non-cooperating writer when the race is observable.
-- The writer supports Windows versions of Python without `os.fchmod` and creates
-  new reports on filesystems without hard links by using `O_CREAT|O_EXCL`.
+- The advisory lock serializes writers that use the helper. Atomic exchange
+  preserves a non-cooperating writer's displaced target when the publication
+  window detects a conflict. Recovery avoids a second exchange whose source name
+  could change after validation.
+- Safe publication requires descriptor-relative operations, descriptor-based mode
+  setting, directory sync, hard links for a missing final leaf, and name exchange
+  for an existing final leaf. Unsupported platforms and filesystems return an
+  error without publishing a new report.
 - Removed dead CLI and fixture wrappers. Code comments and documentation now state
   the mechanism or contract instead of narrating the implementation.
 
@@ -49,9 +75,10 @@ All notable changes to `super-review` are recorded here.
   parses as an unknown field. Fence, indent, or rephrase the line.
 - `Effort` and `Risk of the proposed change` explanations must follow the enum value after ` — `, ` - `, `:`, or ` (`; a comma continuation is rejected.
 - Reports with replacement cycles, contradictory metadata, invalid fence closing
-  whitespace, backticks in backtick-fence info strings, or unsupported Unicode
-  line separators are now rejected consistently. Unbalanced fence markers inside
-  protected annotations remain valid content.
+  whitespace, or backticks in backtick-fence info strings are now rejected
+  consistently. Unicode line separators remain content instead of becoming
+  structural line breaks. Unbalanced fence markers inside protected annotations
+  remain valid content.
 
 ## [1.5.0] (2026-07-28)
 
