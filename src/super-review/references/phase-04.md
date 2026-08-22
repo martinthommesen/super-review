@@ -1,4 +1,4 @@
-# PHASE 4 — END-TO-END WORKFLOW TRACING
+# Phase 4: end-to-end workflow tracing
 
 Identify and trace the most important workflows.
 
@@ -87,5 +87,3 @@ Look for gaps such as:
 - Missing rollback or compensation.
 - Missing operator visibility for stuck work.
 - State transitions that can become permanently wedged.
-
-===============================================================================

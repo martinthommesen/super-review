@@ -1,4 +1,4 @@
-# PHASE 7 — DATA MODELS, DATABASES, MIGRATIONS, AND INTEGRITY
+# Phase 7: data models, databases, migrations, and integrity
 
 Review:
 
@@ -41,7 +41,7 @@ Look for:
 - Lost updates.
 - Write skew.
 - Duplicate creation.
-- Race-prone “check then insert.”
+- Race-prone "check then insert."
 - Incorrect transaction scope.
 - Long-running transactions.
 - Queries inside loops.
@@ -87,5 +87,3 @@ For every risky migration, evaluate:
 8. Rollback strategy.
 9. Validation strategy.
 10. Operational observability.
-
-===============================================================================

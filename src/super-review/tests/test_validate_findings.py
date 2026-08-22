@@ -90,7 +90,7 @@ Classification: Arbitrary
 ```
 """
         report = report.replace(
-            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
             "# 2. Repository and System Overview\n\n" + fenced,
             1,
         )
@@ -127,7 +127,7 @@ Classification: Arbitrary
 ```
 """
         report = report.replace(
-            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
             "# 2. Repository and System Overview\n\n" + snippet,
             1,
         )
@@ -136,7 +136,7 @@ Classification: Arbitrary
 
     def test_backtick_info_fence_line_is_prose(self) -> None:
         report = rf.build_report().replace(
-            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
             "# 2. Repository and System Overview\n\n```python`x\nprose after the non-fence line.",
             1,
         )
@@ -155,7 +155,7 @@ Classification: Arbitrary
 
     def test_exotic_line_separators_do_not_split_lines(self) -> None:
         report = rf.build_report().replace(
-            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
             "# 2. Repository and System Overview\n\nprose\x0b```",
             1,
         )
@@ -165,7 +165,7 @@ Classification: Arbitrary
     def test_close_fence_allows_only_space_and_tab(self) -> None:
         base = (
             "# 2. Repository and System Overview\n\n"
-            "No current canonical records supported — test fixture."
+            "No current canonical records supported: test fixture."
         )
         good = rf.build_report().replace(
             base,

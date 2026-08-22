@@ -1,4 +1,4 @@
-# Canonical `FINDINGS.md` Lifecycle
+# Canonical `FINDINGS.md` lifecycle
 
 This file is the single normative source for creation, revalidation, identity, annotation preservation, resumability, conflict handling, and replacement of the review report.
 
@@ -41,7 +41,11 @@ Human-maintained content. This text is not generated evidence.
 <!-- SUPER-REVIEW:HUMAN-END id="global-decisions" -->
 ```
 
-Block identifiers must be unique, begin with a lowercase letter or digit, contain only lowercase letters, digits, dots, underscores, or hyphens, and be at most 64 characters long (`[a-z0-9][a-z0-9._-]{0,63}`). An identifier outside this exact form does not create a protected block — the markers become plain text with no preservation guarantee. Blocks may be global or placed within a canonical record.
+Block identifiers must be unique, begin with a lowercase letter or digit, contain
+only lowercase letters, digits, dots, underscores, or hyphens, and be at most 64
+characters long (`[a-z0-9][a-z0-9._-]{0,63}`). Markers with an invalid identifier
+are plain text and receive no preservation guarantee. Blocks may be global or
+placed within a canonical record.
 
 Block bodies are opaque to structural parsing: fence-looking lines inside an annotation are content, never fence markers, so an annotation containing an unbalanced code fence stays valid and preserved. Outside blocks, fenced regions neutralize block markers; backtick fences follow CommonMark (an info string containing a backtick is not a fence opener), and a closing fence permits only trailing spaces and tabs.
 
@@ -60,7 +64,8 @@ If a concurrent edit adds or changes a protected block after the initial snapsho
 
 ## Machine-readable identifier registry
 
-Place exactly one registry as the first nonblank content of the report — before `# 1. Executive Summary` and before any protected human block:
+Place one registry as the report's first nonblank content, before
+`# 1. Executive Summary` and any protected human block:
 
 ```markdown
 <!-- SUPER-REVIEW-REGISTRY
@@ -187,7 +192,10 @@ On resume, recheck the root, revision, worktree, dependencies, generated artifac
 
 ## Candidate generation and mechanical validation
 
-Generate the complete candidate outside the repository. It must include the registry, preserved human blocks, report metadata, sections 1–18 in order, canonical records, active-ID references, retired-ID handling, and validation limitations.
+Generate the complete candidate outside the repository. It must include the
+registry, preserved human blocks, report metadata, sections 1 through 18 in
+order, canonical records, active-ID references, retired-ID handling, and
+validation limitations.
 
 Run:
 
@@ -212,9 +220,16 @@ If the digest changed, do not overwrite the file. The change may contain human d
 
 Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` when Python 3 is available. The path must resolve from the loaded skill package, never from the target repository. It validates the candidate, requires the candidate's stated `Canonical root` to be absolute and match the commit destination without dereferencing the report-controlled path, obtains an out-of-repository advisory lock, verifies the expected digest, verifies protected blocks, writes a same-directory temporary file, flushes it, rereads the target immediately before replacement, atomically replaces the target, flushes the directory where supported, and verifies the final digest. It refuses symbolic-link targets, digest conflicts, relative canonical roots, and any candidate whose stated canonical root belongs to a different repository. The path CLI is a thin front on `commit_bytes`, the single write core.
 
-The canonical-root check is the last line of defense against writing a report generated for one repository into another repository's `FINDINGS.md` — for example, when two concurrent reviews collide on a shared candidate path. Generate each candidate with the correct absolute `Canonical root` for its target, and keep candidates for different targets under distinct out-of-repository paths.
+The canonical-root check prevents a report generated for one repository from
+being written to another. This can happen when concurrent reviews share a
+candidate path. Give each candidate the target's absolute `Canonical root` and
+use a distinct out-of-repository path for each target.
 
-An atomic rename prevents a partial file; it does not by itself prevent lost updates. The digest gate and advisory lock fully serialize cooperating writers that use this helper; a non-cooperating writer (an editor, another tool) racing the final instant of replacement can still win or lose that race — detection of such writers is best-effort, up to the last pre-replacement read and the post-write verification. Never bypass the digest check merely to satisfy the mandatory-write requirement. The run is incomplete until a safe write succeeds. If the file continues changing and cannot be reconciled, leave the current file intact, report the concurrent-edit conflict, and do not claim that `FINDINGS.md` was refreshed.
+An atomic rename prevents partial files but not lost updates. The digest check
+and advisory lock serialize writers that use the helper. A separate editor or
+tool can still race the replacement. Reads immediately before and after the
+write detect that race when possible. Never bypass the digest check. If changes
+cannot be reconciled, leave the file intact and report the conflict.
 
 ## Post-write verification
 

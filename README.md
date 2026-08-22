@@ -2,25 +2,36 @@
 
 [![CI](https://github.com/martinthommesen/super-review/actions/workflows/ci.yml/badge.svg)](https://github.com/martinthommesen/super-review/actions/workflows/ci.yml)
 
-`super-review` is an Agent Skill that performs an exhaustive, evidence-based review of an entire repository — engineering, architecture, correctness, security, privacy, reliability, performance, data, APIs, testing, operations, UX, developer experience, and feature-portfolio decisions — and maintains exactly one canonical report:
+`super-review` is an Agent Skill for evidence-based repository reviews. It
+maintains one canonical report:
 
 ```text
 <reviewed-repository-root>/FINDINGS.md
 ```
 
-It works with Claude Code, GitHub Copilot CLI, Codex, Cursor, and other hosts that load Agent Skills. The current skill version is **1.6.0**.
+It works with Claude Code, GitHub Copilot CLI, Codex, Cursor, and other Agent
+Skills hosts. The current skill version is **1.6.0**.
 
-## Why it is different
+## What it does
 
-- **One living report, not a stream of one-off reviews.** An existing `FINDINGS.md` is treated as a set of claims to revalidate: resolved or stale material is retired, surviving findings keep stable canonical IDs, and every run merges revalidated prior content with fresh independent discovery.
-- **Evidence over vibes.** Confirmed findings require current repository evidence. Facts, supported inferences, hypotheses, and missing evidence are labeled as such; inapplicable areas are closed with an explicit evidence-based reason, never silently skipped.
-- **Safe by construction.** The reviewed repository is treated as potentially malicious. Repository-defined commands pass a command-safety gate, bundled helpers are resolved only from the trusted skill root (never from the target repo), and the final report write is digest-gated, exact-byte, and atomic — a concurrent edit is detected and merged rather than blindly overwritten. Cooperating writers using the helper are fully serialized; a non-cooperating writer racing the final instant of replacement is detected best-effort, up to the last pre-replacement read and post-write verification. Protected human annotations survive regeneration.
-- **Deterministic identities.** Each canonical record gets a reproducible fingerprint, so findings can be tracked, deduplicated, and retired across runs.
-- **Explicit invocation only.** The skill never auto-activates for a generic "review this" request; it runs only when named directly.
+- Revalidates the existing `FINDINGS.md` before adding current results. Resolved
+  claims are retired, and surviving findings keep their IDs.
+- Requires current repository evidence for confirmed findings. It labels
+  inference, uncertainty, missing evidence, and inapplicable checks.
+- Treats the target repository as untrusted. Helpers load from the installed
+  skill, and report writes use exact bytes, digest checks, and atomic replacement.
+- Gives each canonical record a reproducible fingerprint for deduplication and
+  retirement across runs.
+- Runs only when the user names the skill explicitly.
 
 ## Review scope
 
-A run walks up to 23 ordered phases, progressively loading only the instructions each phase needs: baseline and safety, repository inventory, product and feature inventory, architecture, end-to-end workflow tracing, correctness, security and privacy, data and migrations, APIs and integrations, concurrency and distributed systems, performance and cost, reliability and operations, frontend/UX/accessibility, testing strategy, dependencies and supply chain, configuration and deployment, maintainability, better-implementation alternatives, feature-portfolio decisions, documentation, stack-specific deep dives (JavaScript/TypeScript, Python, Go, Rust, Java/Kotlin, C#/.NET, C/C++, SQL, mobile), validation and reproduction, and prioritization/roadmap.
+A run considers 23 ordered phases. They cover repository and product mapping,
+architecture, workflows, correctness, security, data, APIs, concurrency,
+performance, operations, user interfaces, tests, dependencies, deployment,
+maintainability, implementation alternatives, feature decisions, documentation,
+language-specific checks, reproduction, and prioritization. The skill loads the
+detailed instructions for one applicable phase at a time.
 
 See [`examples/FINDINGS.example.md`](examples/FINDINGS.example.md) for a valid report.
 
@@ -59,23 +70,27 @@ Invoke the installed plugin explicitly as `$super-review:super-review`.
 
 #### Cursor
 
-This repository is a Cursor plugin (`.cursor-plugin/plugin.json`). It installs the canonical skill and a thin command adapter — nothing else. The plugin registers no MCP server (decision D15): programmatic access to the FINDINGS helpers goes through the consolidated [`super-review` CLI](cli/README.md), which runs only when explicitly invoked with explicit arguments, so Cursor Auto-run has no ambient tool surface to call.
+This repository is a Cursor plugin (`.cursor-plugin/plugin.json`). It installs
+the canonical skill and a small command adapter. It registers no MCP server.
+Direct programmatic access goes through the [`super-review` CLI](cli/README.md),
+which runs only as an explicit shell command. See decision D15.
 
 Install from the Cursor marketplace once published, or add this repository as a local/team marketplace plugin and install `super-review`.
 
-Requirements on the machine: `python3` for the bundled helpers.
+The bundled helpers require `python3`.
 
-Invoke the skill explicitly (for example via the plugin command or by naming `$super-review` / `@super-review` / `/super-review` per the skill gate).
+Invoke the plugin command or name `$super-review`, `@super-review`, or
+`/super-review`, as supported by the host.
 
 ### Direct skill installation
 
 The distributable skill is the `src/super-review/` directory. Its bundled Codex policy disables implicit invocation, so it can be installed directly for personal or project use:
 
 ```bash
-# Codex — personal (all projects)
+# Codex: personal install for all projects
 cp -R src/super-review ~/.agents/skills/super-review
 
-# Codex — project-level
+# Codex: project install
 cp -R src/super-review /path/to/project/.agents/skills/super-review
 ```
 
@@ -99,36 +114,51 @@ $super-review:super-review /path/to/repository   # Codex marketplace plugin
 /super-review:super-review /path/to/repository   # Claude Code marketplace plugin
 ```
 
-Optional arguments select a review mode and supply context. The default mode is `REVIEW ONLY`, in which the root `FINDINGS.md` is the sole permitted repository modification — the skill never infers permission for source changes, dependency installation, network access, commits, or any irreversible action.
+Optional arguments select a review mode and add context. The default is
+`REVIEW ONLY`. In that mode, the root `FINDINGS.md` is the only permitted
+repository change. The skill does not infer permission to change source, install
+dependencies, use the network, commit, or take irreversible actions.
 
-On completion the skill reports the report path, the reviewed revision, whether the prior report was fully revalidated, the highest-priority active findings, and validation status — the full report lives in `FINDINGS.md`, not the chat.
+On completion, the skill reports the file path, reviewed revision, prior-report
+revalidation status, highest-priority active findings, and validation result.
+The detailed review stays in `FINDINGS.md`.
 
 ### Requirements
 
 - A host with filesystem access to the target repository and permission to create or update its root `FINDINGS.md`.
-- Python 3 recommended — the bundled helpers are standard-library-only and run in isolated mode (`python3 -I`).
+- Python 3 is recommended. The bundled helpers use only the standard library
+  and run in isolated mode with `python3 -I`.
 - Git and code-search tools recommended.
 
 ## Bundled helpers
 
 The skill ships three stdlib-only scripts, always resolved from the trusted skill root:
 
-- `validate_findings.py` — validates a generated report against the canonical schema (also self-tests) and can `--snapshot` exact on-disk bytes/digest.
-- `finding_fingerprint.py` — computes the deterministic canonical-record fingerprint used for finding identity.
-- `commit_findings.py` — the digest-gated, annotation-preserving, atomic report writer (`commit_bytes` core with a path CLI front-end).
+- `validate_findings.py`: validates the report schema, runs its self-test, and
+  can snapshot exact on-disk bytes and their digest.
+- `finding_fingerprint.py`: computes canonical-record fingerprints.
+- `commit_findings.py`: validates and atomically writes a report only when the
+  starting digest still matches.
 
 ```bash
 python3 -I "$SKILL_ROOT/scripts/validate_findings.py" /tmp/FINDINGS.candidate.md
 python3 -I "$SKILL_ROOT/scripts/commit_findings.py" --help
 ```
 
-### Consolidated CLI
+### Command-line interface
 
-`cli/` packages a `super-review` console command (`validate | snapshot | commit | fingerprint`) that wraps the same skill-root helpers. It replaced the earlier MCP companion (decision D15): a CLI has no server and no ambient tool surface, so nothing can invoke it except an explicit shell command with an explicit trusted skill root. It is **not** in the portable skill ZIP. See [`cli/README.md`](cli/README.md).
+`cli/` packages a `super-review` command with `validate`, `snapshot`, `commit`,
+and `fingerprint` subcommands. It calls the same helpers from an explicit trusted
+skill root. The CLI replaced the MCP companion under decision D15 and is not in
+the portable skill ZIP. See [`cli/README.md`](cli/README.md).
 
 ## This repository
 
-This repo contains the skill plus its development and release workbench: `src/super-review/` is the only canonical source (never edit `dist/`), `scripts/` holds the offline check/build/verify pipeline, `tests/` and `src/super-review/tests/` hold the regression suites, and `docs/` records architecture, decisions, and provenance.
+This repository contains the skill and its development tooling.
+`src/super-review/` is the canonical source, `scripts/` contains the offline
+check and release pipeline, the two `tests/` trees contain regression suites,
+and `docs/` records architecture, decisions, and provenance. Never edit `dist/`
+by hand.
 
 ```bash
 make check     # full offline gate: structure, versions, tests, clean-room build + byte-parity verify
@@ -136,7 +166,11 @@ make lint      # ruff lint + format check, ty type check
 make release   # clean + check + spec + build + verify
 ```
 
-Contributions: read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md) first — the skill's strictness guarantees are protected by non-negotiable invariants and regression tests. Security model and disclosure: [`SECURITY.md`](SECURITY.md). No runtime environment variables are required; [`.env.example`](.env.example) documents that empty secret surface, and CI runs gitleaks. Release history: [`CHANGELOG.md`](CHANGELOG.md). No repository script commits, pushes, publishes, or deploys.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md) before
+contributing. [`SECURITY.md`](SECURITY.md) defines the threat model and disclosure
+process. The skill requires no runtime environment variables, and CI runs
+gitleaks. See [`CHANGELOG.md`](CHANGELOG.md) for release history. Repository
+scripts never commit, push, publish, or deploy.
 
 ## License
 

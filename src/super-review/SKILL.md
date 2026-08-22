@@ -56,7 +56,12 @@ Do not preload the protocol. At activation, load only:
 
 Before any repository-defined command, load [the untrusted-repository command-safety gate](references/command-safety.md).
 
-Consider phases 0–22 in order and apply the applicability guide before deep loading. Load exactly one applicable phase file immediately before performing that phase. A conditional phase may be closed without loading its deep reference only after the guide's bounded absence checks establish that no relevant first-party surface exists. Record `Not applicable — <specific evidence basis>` and reopen the phase if later evidence changes applicability.
+Consider phases 0 through 22 in order and apply the applicability guide before
+deep loading. Load one applicable phase file immediately before performing that
+phase. Close a conditional phase without its deep reference only after bounded
+searches establish that no relevant first-party code or behavior exists. Record
+`Not applicable: <specific evidence basis>` and reopen the phase if later
+evidence changes applicability.
 
 | Phase | Reference |
 |---|---|
@@ -95,7 +100,7 @@ All referenced rules are normative. Progressive loading changes when instruction
 1. Resolve instructions, authorization, mode, target, root, exclusions, compatibility contracts, and supplied context.
 2. Snapshot repository state and the exact `FINDINGS.md` bytes/digest. Preserve protected human blocks and build the prior-report revalidation ledger.
 3. Establish command safety before executable validation.
-4. Perform phases 0–22 in order while maintaining coverage and evidence ledgers.
+4. Perform phases 0 through 22 in order while maintaining coverage and evidence ledgers.
 5. Checkpoint long-running analysis outside the repository, bound to root, revision, worktree state, and starting report digest; invalidate stale phase results after changes.
 6. Revalidate every prior claim, then perform independent current-repository discovery. The old report never limits coverage.
 7. Canonicalize by root cause or decision basis; compute deterministic fingerprints; preserve active and retired IDs; derive summaries and roadmap from canonical records.
@@ -109,7 +114,11 @@ Use the requested mode; default to `REVIEW ONLY`. The root `FINDINGS.md` update 
 
 Confirmed and high-confidence records require current repository evidence. Distinguish facts, supported inferences, hypotheses, and unavailable evidence. Trace important behavior through callers, consumers, tests, schemas, configuration, persistence, deployment, failures, retries, cleanup, compensation, and compatibility paths. Manually verify scanner output and protect secrets and personal data.
 
-Exhaustiveness means every meaningful first-party area and required review dimension is considered; it does not mean manufacturing findings. For unsupported or inapplicable fields, alternatives, categories, or subsystem analyses, write `Not applicable — <specific evidence-based reason>` or `Not established — <missing evidence>`.
+Exhaustiveness means considering every meaningful first-party area and required
+review dimension. It does not mean inventing findings. For unsupported or
+inapplicable fields, alternatives, categories, or subsystem analyses, write
+`Not applicable: <specific evidence-based reason>` or `Not established:
+<missing evidence>`.
 
 ## Completion response
 

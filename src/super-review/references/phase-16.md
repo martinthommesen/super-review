@@ -1,4 +1,4 @@
-# PHASE 16 — MAINTAINABILITY, CODE QUALITY, AND DEVELOPER EXPERIENCE
+# Phase 16: maintainability, code quality, and developer experience
 
 Review:
 
@@ -63,5 +63,3 @@ Distinguish:
 - Systemic maintainability issue.
 - Defect-prone design.
 - Onboarding or productivity problem.
-
-===============================================================================

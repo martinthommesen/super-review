@@ -4,14 +4,13 @@
 
 1. Read `AGENTS.md`.
 2. Run `python3 scripts/check.py` to establish a baseline.
-3. Identify every coupled instruction, helper, fixture, test, example, and documentation surface.
+3. Identify every coupled instruction, helper, fixture, test, example, and document.
 4. Keep the change narrowly tied to a demonstrated problem or requirement.
 
 ## Development loop
 
-Optional local hooks (ruff, ty, and cli-check on `cli/` paths)
-before commit — after `uv sync --dev` or `pip install -r requirements-dev.txt`
-(includes the pinned `pre-commit`):
+After `uv sync --dev` or `pip install -r requirements-dev.txt`, install the
+optional local hooks for Ruff, ty, and CLI checks:
 
 ```bash
 pre-commit install   # once per clone

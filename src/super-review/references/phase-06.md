@@ -1,4 +1,4 @@
-# PHASE 6 — SECURITY, PRIVACY, AND ABUSE RESISTANCE
+# Phase 6: security, privacy, and abuse resistance
 
 Establish:
 
@@ -93,7 +93,7 @@ Review for:
 76. Personal-data overcollection.
 77. Missing retention or deletion behavior.
 78. Incomplete account deletion.
-79. Data export leaking other users’ information.
+79. Data export leaking other users' information.
 80. Audit-log tampering or omission.
 
 For each security finding, include:
@@ -113,5 +113,3 @@ For each security finding, include:
 
 Do not include harmful operational exploit instructions beyond what is necessary
 to establish and fix the issue.
-
-===============================================================================

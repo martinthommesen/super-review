@@ -1,4 +1,4 @@
-# Review History
+# Review history
 
 ## Initial packaging
 
@@ -26,6 +26,13 @@ Releases 1.3.0 through 1.5.0 added the wrong-repository commit guard, marketplac
 
 ## External review round 3
 
-The third round (two independent reviews) found divergent fence grammars between the validator and the safe writer, a Windows `os.fchmod` crash, reference-document drift against validator enums, missing license text in the portable archive, an unscoped companion snapshot surface reachable by host auto-run, permissive registry and metadata cross-invariants, an offline gate that could resolve packages, and stale workbench suppressions and docs.
+The third round used two independent reviews. It found different fence grammars
+in the validator and writer, a Windows `os.fchmod` crash, reference values that
+did not match the validator, missing license text, an MCP snapshot tool that
+could read other workspaces, weak registry and metadata checks, network-capable
+offline validation, and stale suppressions and documentation.
 
-The 1.6.0 revision unified structural parsing in one shared scanner, hardened writer platform behavior, tightened registry and metadata invariants, added unknown-field validation, packaged the license text, replaced the MCP companion with a consolidated CLI (decision D15), and made the offline gate hermetic.
+Version 1.6.0 moved structural parsing into one scanner, fixed writer behavior
+across platforms, tightened registry and metadata checks, rejected unknown
+record fields, packaged the license, replaced MCP with a CLI under D15, and made
+the offline gate independent of the network.

@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
-"""Digest-gated, annotation-preserving commit of validated FINDINGS.md bytes.
+"""Validate and atomically replace FINDINGS.md with digest gating.
 
-The candidate is opened once without following its final path component. Those
-exact immutable bytes are validated, staged, and committed. The helper never
-re-reads the candidate path after validation.
-
-Concurrency scope: the advisory lock and digest gate fully serialize
-cooperating writers that use this helper. A non-cooperating writer racing the
-final instant of replacement can still win or lose that race; such writers are
-detected best-effort, up to the last pre-replacement read and the post-write
-verification.
+The helper reads the candidate once, then validates and writes those exact
+bytes. Its lock serializes cooperating writers. Reads immediately before and
+after replacement detect non-cooperating writers when possible.
 """
 
 from __future__ import annotations
@@ -196,22 +190,7 @@ def _read_target(target: Path) -> tuple[str, bytes, os.stat_result | None]:
 
 
 def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
-    """
-    Extract protected report blocks while preserving their original bytes.
-
-    The validator's ``scan_report_structure`` is the single canonical structure
-    grammar; the writer holds no parser of its own, so bytes can never be
-    structurally valid to one program and invalid to the other.
-
-    Parameters:
-        data (bytes): Report content to scan.
-
-    Returns:
-        dict[str, bytes]: Mapping of block identifiers to their original byte content.
-
-    Raises:
-        CommitError: If the report structure is invalid.
-    """
+    """Extract exact protected blocks with the validator's canonical scanner."""
     scan = _VALIDATOR.scan_report_structure(data)
     if scan.errors:
         raise CommitError("; ".join(scan.errors))
@@ -219,16 +198,7 @@ def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
 
 
 def _verify_human_blocks(current: bytes, candidate: bytes) -> None:
-    """
-    Verify that protected human-authored blocks are present and unchanged in the candidate content.
-
-    Parameters:
-        current (bytes): Existing file content containing the protected blocks.
-        candidate (bytes): Proposed file content to validate against the existing blocks.
-
-    Raises:
-        CommitError: If a protected block is missing from or changed in the candidate content.
-    """
+    """Reject a candidate that drops or changes a protected block."""
     current_blocks = _parse_human_blocks_bytes(current)
     candidate_blocks = _parse_human_blocks_bytes(candidate)
     for block_id, raw in current_blocks.items():
@@ -327,31 +297,18 @@ class AdvisoryLock:
 
 
 def _set_mode(fd: int, path: Path, mode: int) -> None:
-    """
-    Apply the specified permission mode to an open file.
-    """
+    """Apply a mode through the descriptor when the platform supports it."""
     fchmod = getattr(os, "fchmod", None)
     if fchmod is not None:
         fchmod(fd, mode)
     else:
-        # Windows before Python 3.13 lacks os.fchmod; the descriptor's path
-        # was just created by this process, so chmod by name is equivalent.
+        # Windows before Python 3.13 lacks os.fchmod. This process just created
+        # the path, so chmod by name is equivalent here.
         os.chmod(path, mode)
 
 
 def _write_temp(root: Path, candidate: bytes, mode: int | None) -> Path:
-    """
-    Write candidate content to a durable temporary file in the repository.
-
-    Parameters:
-        root (Path): Directory in which to create the temporary file.
-        candidate (bytes): Content to write.
-        mode (int | None): File permission bits to apply, or ``None`` to use
-            default permissions.
-
-    Returns:
-        Path: Path to the temporary file.
-    """
+    """Write and fsync a temporary report beside the target."""
     fd, raw_path = tempfile.mkstemp(
         prefix=".FINDINGS.md.super-review.", suffix=".tmp", dir=root
     )
@@ -394,25 +351,7 @@ def commit_bytes(
     source: str = "<bytes>",
     candidate_stat: os.stat_result | None = None,
 ) -> dict[str, str]:
-    """
-    Validate candidate report bytes and atomically commit them to the repository's findings file.
-
-    Parameters:
-        repo_root (Path): Repository root containing ``FINDINGS.md``.
-        candidate_bytes (bytes): Complete report content to validate and commit.
-        expected_digest (str): Digest expected for the current findings file, or ``"MISSING"``.
-        lock_timeout (float): Maximum time to wait for the repository lock.
-        dry_run (bool): Whether to validate without writing the candidate.
-        source (str): Source label used in validation errors.
-        candidate_stat (os.stat_result | None): Optional candidate metadata used to detect hard links to the target.
-
-    Returns:
-        dict[str, str]: Commit path, digests, and status metadata.
-
-    Raises:
-        CommitError: If validation, repository checks, or post-commit verification fails.
-        ConflictError: If the findings file changes or appears contrary to the expected digest.
-    """
+    """Validate candidate bytes and atomically write the repository report."""
     if len(candidate_bytes) > MAX_REPORT_BYTES:
         raise CommitError(f"{source} exceeds {MAX_REPORT_BYTES} byte safety limit")
 
@@ -489,8 +428,7 @@ def commit_bytes(
                         try:
                             link(temp_path, target, follow_symlinks=False)
                         except (NotImplementedError, TypeError):
-                            # Platforms lacking follow_symlinks support still
-                            # get an atomic create-if-absent from plain link.
+                            # Plain link is still atomic when this option is absent.
                             link(temp_path, target)
                         created_via_link = True
                     except FileExistsError as exc:
@@ -498,15 +436,12 @@ def commit_bytes(
                             "FINDINGS.md appeared before creation; refusing to overwrite it"
                         ) from exc
                     except OSError:
-                        # Filesystems without hard-link support (some SMB,
-                        # FUSE, and exFAT mounts) refuse link entirely; the
-                        # O_CREAT|O_EXCL create below is equally atomic.
+                        # Some filesystems reject hard links. Claim the target
+                        # with O_CREAT|O_EXCL instead.
                         created_via_link = False
                 if not created_via_link:
-                    # Atomically claim the name with an empty exclusive
-                    # placeholder, then atomically replace it with the fully
-                    # written, fsynced temp file. A crash can leave an empty
-                    # placeholder behind but never a partially written report.
+                    # Claim the name with an empty placeholder, then replace it
+                    # with the fsynced temp file. A crash cannot expose partial data.
                     creation_flags = (
                         os.O_WRONLY
                         | os.O_CREAT
@@ -529,11 +464,8 @@ def commit_bytes(
                             os.close(placeholder_fd)
                         os.replace(temp_path, target)
                     except BaseException:
-                        # Remove the path only while it still is our
-                        # placeholder (identity is read before the failable
-                        # mode step); never delete a file another writer put
-                        # there meanwhile, and without a captured identity
-                        # leave the path alone.
+                        # Delete only the placeholder inode captured before the
+                        # mode change. A concurrent writer's file stays intact.
                         if placeholder_info is not None:
                             with contextlib.suppress(OSError):
                                 current_info = os.lstat(target)

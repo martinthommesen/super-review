@@ -1,10 +1,10 @@
-# PHASE 18 — FEATURE ADDITION, IMPROVEMENT, CONSOLIDATION, AND REMOVAL
+# Phase 18: feature portfolio decisions
 
 Strict anti-filler rule: consider every decision category, but include a canonical feature-decision record only when repository evidence or an explicitly identified product-validation need supports it. For an empty category, state that no recommendation is currently supported and cite the coverage basis; do not brainstorm generic features.
 
 This phase is mandatory.
 
-Review the feature portfolio, not just the implementation.
+Review both the feature portfolio and its implementation.
 
 Classify each significant recommendation as one of:
 
@@ -19,9 +19,7 @@ Classify each significant recommendation as one of:
 - EXPERIMENT.
 - INVESTIGATE.
 
--------------------------------------------------------------------------------
-FEATURES TO ADD
--------------------------------------------------------------------------------
+## Features to add
 
 Identify missing features only when repository evidence indicates a real gap.
 
@@ -117,9 +115,7 @@ For every proposed feature addition, provide:
 
 Do not invent numerical usage, revenue, conversion, or adoption estimates.
 
--------------------------------------------------------------------------------
-FEATURES TO IMPROVE OR SIMPLIFY
--------------------------------------------------------------------------------
+## Features to improve or simplify
 
 Identify features that:
 
@@ -153,9 +149,7 @@ For every improvement, identify:
 - Potential downside.
 - Validation required.
 
--------------------------------------------------------------------------------
-FEATURES TO MERGE
--------------------------------------------------------------------------------
+## Features to merge
 
 Identify features that:
 
@@ -180,9 +174,7 @@ For every merge recommendation, identify:
 - Deprecation sequence.
 - Rollback strategy.
 
--------------------------------------------------------------------------------
-FEATURES TO REPLACE
--------------------------------------------------------------------------------
+## Features to replace
 
 Recommend replacement when a feature:
 
@@ -207,9 +199,7 @@ For every replacement recommendation, include:
 - Rollback strategy.
 - Risks introduced by the replacement.
 
--------------------------------------------------------------------------------
-FEATURES TO DEPRECATE OR REMOVE
--------------------------------------------------------------------------------
+## Features to deprecate or remove
 
 Search for:
 
@@ -258,9 +248,7 @@ For every deprecation or removal candidate, provide:
 When usage cannot be established, recommend instrumentation or investigation
 rather than immediate removal.
 
--------------------------------------------------------------------------------
-FEATURES TO KEEP
--------------------------------------------------------------------------------
+## Features to keep
 
 Explicitly identify important features and implementations that should remain.
 
@@ -272,9 +260,7 @@ For each, explain:
 - Which tests protect it.
 - Which future refactors must not accidentally remove or weaken it.
 
--------------------------------------------------------------------------------
-EXPERIMENTS
--------------------------------------------------------------------------------
+## Experiments
 
 Feature experiments must include:
 
@@ -297,5 +283,3 @@ Feature investigations must include:
 - Decision threshold.
 
 Do not recommend permanent feature flags without lifecycle ownership.
-
-===============================================================================

@@ -1,4 +1,4 @@
-# PHASE 1 — COVERAGE LEDGER AND REPOSITORY INVENTORY
+# Phase 1: coverage ledger and repository inventory
 
 Create a coverage ledger for every top-level directory and meaningful project
 area.

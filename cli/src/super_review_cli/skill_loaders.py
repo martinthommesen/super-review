@@ -15,14 +15,7 @@ class SkillLoadError(RuntimeError):
 
 
 def _require_regular_file(path: Path, *, label: str) -> Path:
-    """Validate a path as a regular, non-symbolic-link file.
-
-    Parameters:
-        path (Path): Path to inspect.
-        label (str): Descriptive label used in validation errors.
-
-    Returns:
-        Path: The strictly resolved file path."""
+    """Reject symlinks and non-regular files, then resolve the path."""
     try:
         info = os.lstat(path)
     except OSError as exc:
@@ -38,18 +31,7 @@ def _require_regular_file(path: Path, *, label: str) -> Path:
 
 
 def resolve_skill_root(skill_root: Path) -> Path:
-    """
-    Validate and resolve the root directory of a skill.
-
-    Parameters:
-        skill_root (Path): Absolute path to the skill directory.
-
-    Returns:
-        Path: Resolved skill-root path containing a regular `SKILL.md` file and a safe `scripts` directory.
-
-    Raises:
-        SkillLoadError: If the path is invalid, inaccessible, symbolic-linked, or lacks the required skill files and directories.
-    """
+    """Validate an absolute skill root and its required files."""
     root = skill_root.expanduser()
     if not root.is_absolute():
         raise SkillLoadError(f"skill root must be an absolute path, got {skill_root}")
@@ -78,20 +60,7 @@ def resolve_skill_root(skill_root: Path) -> Path:
 
 
 def load_helper(skill_root: Path, filename: str, module_name: str) -> ModuleType:
-    """
-    Load a helper module from a skill's scripts directory.
-
-    Parameters:
-        skill_root (Path): Absolute path to the skill root.
-        filename (str): Helper filename within the scripts directory.
-        module_name (str): Name to assign to the loaded module.
-
-    Returns:
-        ModuleType: The loaded helper module.
-
-    Raises:
-        SkillLoadError: If the skill root, helper file, or module specification is invalid.
-    """
+    """Load one helper from the validated skill scripts directory."""
     root = resolve_skill_root(skill_root)
     leaf = root / "scripts" / filename
     sibling = _require_regular_file(leaf, label="helper")
@@ -108,31 +77,3 @@ def load_helper(skill_root: Path, filename: str, module_name: str) -> ModuleType
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
-
-
-def load_helpers(skill_root: Path) -> dict[str, ModuleType]:
-    """Load the skill's fingerprinting, validation, and commit helper modules.
-
-    Parameters:
-        skill_root (Path): Root directory of the skill containing the helper scripts.
-
-    Returns:
-        dict[str, ModuleType]: Helper modules keyed by ``"fingerprint"``, ``"validate"``, and ``"commit"``.
-    """
-    return {
-        "fingerprint": load_helper(
-            skill_root,
-            "finding_fingerprint.py",
-            "_super_review_companion_fingerprint",
-        ),
-        "validate": load_helper(
-            skill_root,
-            "validate_findings.py",
-            "_super_review_companion_validate",
-        ),
-        "commit": load_helper(
-            skill_root,
-            "commit_findings.py",
-            "_super_review_companion_commit",
-        ),
-    }

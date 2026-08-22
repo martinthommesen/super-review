@@ -1,4 +1,4 @@
-# PHASE 13 — TESTING AND QUALITY STRATEGY
+# Phase 13: testing and quality strategy
 
 Inventory:
 
@@ -74,5 +74,3 @@ For every major finding, propose the most appropriate regression-test level:
 
 Do not propose end-to-end tests when a smaller deterministic test proves the
 behavior adequately.
-
-===============================================================================

@@ -1,4 +1,4 @@
-# PHASE 11 — RELIABILITY, RESILIENCE, AND OPERATIONS
+# Phase 11: reliability, resilience, and operations
 
 Review:
 
@@ -75,5 +75,3 @@ Identify operational features that should be added, such as:
 - Safe administrative repair tools.
 
 Only recommend them when tied to actual system risks or workflows.
-
-===============================================================================

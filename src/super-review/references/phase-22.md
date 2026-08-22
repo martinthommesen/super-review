@@ -1,4 +1,4 @@
-# PHASE 22 — PRIORITIZATION AND ROADMAP
+# Phase 22: prioritization and roadmap
 
 Prioritize findings using evidence, not arbitrary scoring.
 
@@ -19,31 +19,31 @@ For defects, consider:
 
 Use these severity levels:
 
-CRITICAL
+### Critical
 
 - Immediate risk of major security compromise, irreversible data loss,
   substantial cross-tenant exposure, widespread outage, or similarly severe
   consequences.
 - Should block release or trigger immediate remediation.
 
-HIGH
+### High
 
 - Serious correctness, security, data-integrity, reliability, or operational
   risk.
 - Likely to affect important workflows or create substantial damage.
 - Should be prioritized urgently.
 
-MEDIUM
+### Medium
 
 - Material defect or design problem with bounded impact.
 - Should be scheduled, but does not normally require emergency action.
 
-LOW
+### Low
 
 - Limited-impact issue, maintainability problem, narrow edge case, or
   defense-in-depth opportunity.
 
-INFORMATIONAL
+### Informational
 
 - Observation, positive pattern, optional optimization, or recommendation
   without a current defect.
@@ -67,36 +67,34 @@ Do not fabricate numeric RICE, ROI, adoption, revenue, or effort values.
 
 Use qualitative priority groups:
 
-NOW
+### Now
 
 - Critical or high-severity issues.
 - Low-risk fixes with immediate material value.
 - Required foundations for other work.
 
-NEXT
+### Next
 
 - Important structural improvements.
 - High-value workflow improvements.
 - Strongly supported feature additions.
 - Planned deprecations requiring preparation.
 
-LATER
+### Later
 
 - Valuable but non-urgent improvements.
 - Scale-dependent optimization.
 - Larger redesigns requiring evidence or sequencing.
 
-INVESTIGATE
+### Investigate
 
 - Plausible opportunities lacking usage, product, performance, or operational
   evidence.
 - Include the exact evidence-gathering plan.
 
-DO NOT PURSUE
+### Do not pursue
 
 - Recommendations whose cost, risk, or complexity outweigh likely value.
 - Attractive but unnecessary rewrites.
 - Premature scaling work.
 - Features unsupported by repository evidence.
-
-===============================================================================

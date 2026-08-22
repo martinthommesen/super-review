@@ -2,7 +2,7 @@
 
 ## System boundaries
 
-The workbench has two deliberately separate layers.
+The workbench separates shipped files from maintainer tooling.
 
 ### Shipped skill
 
@@ -23,15 +23,32 @@ The repository exposes four client-native marketplace/plugin catalogs without du
 - `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex;
 - `.cursor-plugin/plugin.json` for Cursor (repo-root single-plugin manifest).
 
-Claude, Copilot, and Codex catalogs resolve `src/` as their plugin root. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`; explicit-only activation is enforced by the skill description and invocation gate rather than client invocation-control frontmatter, which is not portable and blocks the Skill-tool path Claude Code uses even for user-typed commands. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Cursor's plugin root is the repository itself: it points `skills` at `./src/super-review` and ships a thin Cursor command under `src/client-adapters/cursor/commands/`; it registers no MCP server (see D15). Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
+Claude, Copilot, and Codex resolve `src/` as their plugin root. Claude and
+Copilot share a command adapter that loads `src/super-review/SKILL.md`. The skill
+description and invocation gate enforce explicit activation. Client frontmatter
+cannot enforce this portably and blocks Claude Code's Skill-tool path even for a
+user-typed command.
+
+Codex resolves `src/super-review/` and uses `agents/openai.yaml`. Cursor uses the
+repository as its plugin root, points `skills` at `./src/super-review`, and adds
+the command under `src/client-adapters/cursor/commands/`. Cursor registers no MCP
+server. See D15. Every client loads the same skill files.
 
 ### Repository workbench
 
 Root `scripts/`, root `tests/`, docs, CI, build metadata, marketplace catalogs, and marketplace adapter manifests exist only for maintainers or repository-backed installation. They do not enter the portable direct-skill archive. That archive includes Codex's explicit-only policy and is suitable for other direct-install hosts only when they provide an equivalent invocation gate; Claude and Copilot use the marketplace adapters instead.
 
-### Consolidated CLI
+### Command-line interface
 
-`cli/` is a consolidated `super-review` console command over the shipped FINDINGS helpers, replacing the earlier MCP companion (decision D15). It is outside the portable ZIP and outside every marketplace skill payload: Claude, Copilot, and Codex resolve `src/` as their plugin root, and while Cursor's repo-root manifest materializes the whole repository on install, it wires only `./src/super-review` and the Cursor command adapter — nothing references `cli/`. The package has its own `pyproject.toml`, lockfile, and CI job, and its runtime is dependency-free. Each subcommand resolves the requested helper from the explicit trusted skill root (`skill_loaders.py`: absolute root, symlink and escape checks) and forwards its arguments verbatim to that helper's `main`, so flag surfaces and exit codes are identical to direct `python3 -I` invocation. `snapshot` accepts only a repository root and derives `<repo-root>/FINDINGS.md`. There is no server: nothing runs unless explicitly invoked.
+`cli/` packages the shipped FINDINGS helpers as a `super-review` command. It is
+outside the portable ZIP and marketplace skill payloads. Cursor installs the
+repository but wires only the canonical skill and command adapter.
+
+The package has its own build metadata, lockfile, and CI job. Its runtime uses
+only the Python standard library. `skill_loaders.py` loads each helper from an
+explicit skill root after absolute-path, symlink, and escape checks. Subcommands
+preserve the helper arguments and exit codes. `snapshot` accepts a repository
+root and derives `<repo-root>/FINDINGS.md`. No server runs in the background.
 
 ## Instruction loading
 
@@ -46,7 +63,7 @@ A run follows this state model:
 1. Resolve canonical repository root and report path.
 2. Read exact existing report bytes and compute the starting digest, or record `MISSING`.
 3. Parse and revalidate every prior canonical record and derived claim.
-4. Independently review the current repository through phases 0–22.
+4. Independently review the current repository through phases 0 through 22.
 5. Canonicalize current records and preserve or retire IDs according to fingerprints.
 6. Generate a complete candidate outside the reviewed repository.
 7. Validate the candidate's exact bytes.

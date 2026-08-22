@@ -1,6 +1,8 @@
-# Release Process
+# Release process
 
-Repository tooling is local and validation-gated: no script or make target commits, pushes, publishes, or creates a remote release. The only steps that touch a remote — publishing (step 8) and tag creation (step 9) — are explicit operator actions run by hand after every gate has passed.
+Repository tooling is local and validation-gated. No script or Make target
+commits, pushes, publishes, or creates a remote release. Only the manual publish
+and tag steps touch a remote.
 
 ## 1. Prepare the change
 
@@ -74,7 +76,10 @@ Publishing is intentionally outside repository automation. Push the verified mar
 
 ## 9. Tag the release
 
-This step is an explicit operator action, like step 8: nothing in `scripts/` or the Makefile creates or pushes tags. After the release commit is on the default branch, create an annotated tag so marketplace consumers can pin revisions (for example Codex `--ref`). A tag is only as immutable as the remote makes it: protect `v*` tags against updates and deletion (on GitHub, a tag ruleset), and record the tagged commit SHA in the release notes so consumers can pin the exact revision even where tag protection is not in place:
+This is a manual operator action. Nothing in `scripts/` or the Makefile creates
+or pushes tags. After the release commit reaches the default branch, create an
+annotated tag so consumers can pin the revision. Protect `v*` tags against
+updates and deletion, and record the commit SHA in the release notes.
 
 ```bash
 git tag -a vX.Y.Z -m "super-review X.Y.Z"

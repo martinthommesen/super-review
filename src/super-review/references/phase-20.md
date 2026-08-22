@@ -1,4 +1,4 @@
-# Phase 20 — Language- and Framework-Specific Review
+# Phase 20: language- and framework-specific review
 
 Load this dispatcher for every review. Detect the actual languages, query systems, frameworks, runtimes, and client platforms from manifests, build files, imports, generated sources, tests, deployment artifacts, and entry points.
 

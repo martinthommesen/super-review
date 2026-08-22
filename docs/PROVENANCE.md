@@ -1,4 +1,4 @@
-# Source Provenance
+# Source provenance
 
 ## Original review prompt
 

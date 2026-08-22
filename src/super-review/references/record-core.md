@@ -1,4 +1,4 @@
-# Canonical Record Schemas
+# Canonical record schemas
 
 Load this file only when canonicalizing review results. It separates defects and risks, improvements and alternatives, feature decisions, and positive patterns so each conclusion has one authoritative record.
 
@@ -8,44 +8,51 @@ Load this file only when canonicalizing review results. It separates defects and
 - Summary tables, domain summaries, security summaries, roadmaps, and implementation sequences reference canonical IDs instead of repeating record bodies.
 - Consolidate records that share one root cause or decision basis. List all affected locations in the surviving record.
 - Use current repository evidence. A scanner result, comment, filename, age, or subjective preference is not sufficient by itself.
-- Every field is mandatory unless the template marks it conditional. When evidence does not support a field, write `Not applicable — <specific evidence-based reason>` or `Not established — <missing evidence and validation needed>`. Do not omit fields or manufacture content.
+- Every field is mandatory unless the template marks it conditional. When
+  evidence does not support a field, write `Not applicable: <specific
+  evidence-based reason>` or `Not established: <missing evidence and validation
+  needed>`. Do not omit fields or manufacture content.
 - Active records use `Status: Active`. Resolved, superseded, consolidated, and invalidated identities exist only in the retired registry and concise validation history, not as active canonical records.
 - Use deterministic identity and ID rules from `references/findings-lifecycle.md`.
 - Record numbers use at least three digits (`PREFIX-001`); shorter numbers do not parse as canonical records.
-- Every `Label: value` line inside a record body must be a field defined for that record type (SEC-only fields on `SEC` records, decision-specific fields for the record's stated `Decision`, and Options A–D fields inside improvement records). Colon-led prose inside a field value parses as a new field boundary and is rejected — fence it, indent it, or rephrase it.
-- Enumerated field values (`Effort`, `Risk of the proposed change`) may append an explanation only after ` — `, ` - `, `:`, or ` (`; any other continuation, including a comma, is rejected.
+- Every `Label: value` line inside a record body must be a field defined for that
+  record type. This includes SEC-only fields, decision-specific feature fields,
+  and fields under Options A through D in improvement records. A colon-led prose
+  line parses as a new field, so fence, indent, or rephrase it.
+- Append explanations to `Effort` and `Risk of the proposed change` with a colon.
+  The validator also accepts the compatibility separators ` - `, ` — `, and ` (`.
 
 ## Allowed prefixes
 
 ### Defects and risks
 
-- `COR` — correctness and business logic.
-- `SEC` — security, privacy, authorization, abuse resistance, or sensitive-data risk.
-- `DAT` — data model, persistence, migration, or integrity.
-- `ARC` — architecture, responsibility, dependency, or systemic design risk.
-- `REL` — reliability, resilience, distributed workflow, or availability.
-- `PER` — performance, scalability, resource, or cost risk.
-- `API` — API, schema, event, file-format, or compatibility contract.
-- `TST` — testing strategy or misleading/brittle test defect.
-- `OPS` — operations, observability, deployment, rollback, infrastructure, or supply-chain risk.
-- `MNT` — maintainability or code-quality concern.
-- `UX` — UX, accessibility, internationalization, or client-behavior concern.
-- `DOC` — documentation or knowledge-quality issue.
-- `DX` — developer-experience or tooling issue.
+- `COR`: correctness and business logic.
+- `SEC`: security, privacy, authorization, abuse resistance, or sensitive-data risk.
+- `DAT`: data model, persistence, migration, or integrity.
+- `ARC`: architecture, responsibility, dependency, or systemic design risk.
+- `REL`: reliability, resilience, distributed workflow, or availability.
+- `PER`: performance, scalability, resource, or cost risk.
+- `API`: API, schema, event, file-format, or compatibility contract.
+- `TST`: testing strategy or misleading or brittle test defects.
+- `OPS`: operations, observability, deployment, rollback, infrastructure, or supply-chain risk.
+- `MNT`: maintainability or code-quality concern.
+- `UX`: UX, accessibility, internationalization, or client-behavior concern.
+- `DOC`: documentation or knowledge-quality issue.
+- `DX`: developer-experience or tooling issue.
 
 ### Improvements and alternatives
 
-- `IMP` — materially better implementation or workflow without a current defect.
-- `ALT` — alternative component, system, architecture, or technology design.
+- `IMP`: materially better implementation or workflow without a current defect.
+- `ALT`: alternative component, system, architecture, or technology design.
 
 ### Feature decisions
 
-- `FEAT` — add, improve, simplify, merge, replace, keep, experiment, or investigate.
-- `REM` — deprecate or remove.
+- `FEAT`: add, improve, simplify, merge, replace, keep, experiment, or investigate.
+- `REM`: deprecate or remove.
 
 ### Positive patterns
 
-- `POS` — design, control, workflow, test, operational practice, or abstraction worth preserving.
+- `POS`: design, control, workflow, test, operational practice, or abstraction worth preserving.
 
 ## Common identity header
 
@@ -64,7 +71,7 @@ Status: Active
 
 `ID category` must match the ID prefix. `Fingerprint` must match the deterministic value for the four identity fields.
 
-# Derived references
+## Derived references
 
 - `# 5. Top Findings` contains concise rows pointing to active IDs. It must not duplicate full evidence or recommendations.
 - Sections 6, 7, 8, and 18 contain the full canonical records for their respective record types.

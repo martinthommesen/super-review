@@ -1,4 +1,4 @@
-# PHASE 10 — PERFORMANCE, SCALABILITY, AND COST
+# Phase 10: performance, scalability, and cost
 
 Review hot paths and likely scaling boundaries.
 
@@ -66,5 +66,3 @@ Do not claim performance improvement without explaining:
 
 Recommend profiling or benchmarking when repository evidence alone is
 insufficient.
-
-===============================================================================

@@ -198,8 +198,8 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(canonical_link, (SKILL / "SKILL.md").resolve(strict=True))
 
         # The plugin registers no MCP server (decision D15): the consolidated
-        # CLI replaced the companion, so there is no ambient tool surface for
-        # Auto-run to invoke. Its executable smoke lives in cli/tests/.
+        # CLI replaced the companion, so Auto-run has no registered tool to
+        # invoke. Its executable smoke lives in cli/tests/.
         self.assertNotIn("mcpServers", manifest)
         self.assertFalse(
             (ROOT / "src" / "client-adapters" / "cursor" / "mcp.json").exists()

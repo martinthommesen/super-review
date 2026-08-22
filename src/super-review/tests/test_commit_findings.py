@@ -18,17 +18,6 @@ def digest(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def add_global_human_block(report: str, body: str = "Human decision.\n") -> str:
-    marker = "-->\n"
-    end = report.index(marker) + len(marker)
-    block = (
-        '<!-- SUPER-REVIEW:HUMAN-START id="global-decisions" -->\n'
-        + body
-        + '<!-- SUPER-REVIEW:HUMAN-END id="global-decisions" -->\n'
-    )
-    return report[:end] + block + report[end:]
-
-
 class CommitFindingsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -138,7 +127,9 @@ class CommitFindingsTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), concurrent)
 
     def test_protected_human_block_cannot_be_removed(self) -> None:
-        current = add_global_human_block(self.report()).encode("utf-8")
+        current = rf.add_global_human_block(self.report(), "Human decision.\n").encode(
+            "utf-8"
+        )
         (self.repo / "FINDINGS.md").write_bytes(current)
         self.write_candidate(self.report())
         with self.assertRaisesRegex(cf.CommitError, "omits protected human block"):
@@ -146,7 +137,9 @@ class CommitFindingsTests(unittest.TestCase):
         self.assertEqual((self.repo / "FINDINGS.md").read_bytes(), current)
 
     def test_protected_human_block_survives_byte_for_byte(self) -> None:
-        current_text = add_global_human_block(self.report(), "  Manual decision.  \n")
+        current_text = rf.add_global_human_block(
+            self.report(), "  Manual decision.  \n"
+        )
         current = current_text.encode("utf-8")
         (self.repo / "FINDINGS.md").write_bytes(current)
         candidate_text = current_text.replace(
@@ -331,7 +324,7 @@ class CommitFindingsTests(unittest.TestCase):
             )
 
     def test_commit_bytes_preserves_annotations(self) -> None:
-        current_text = add_global_human_block(self.report(), "Keep me.\n")
+        current_text = rf.add_global_human_block(self.report(), "Keep me.\n")
         current = current_text.encode("utf-8")
         (self.repo / "FINDINGS.md").write_bytes(current)
         candidate = current_text.replace(
@@ -462,12 +455,7 @@ class CommitFindingsTests(unittest.TestCase):
         )
 
         def write_then_refuse(src, dst, *args, **kwargs):
-            """
-            Write concurrent content to the target and raise a permission error to simulate unsupported hard links.
-
-            Raises:
-                OSError: Always raised with errno.EPERM.
-            """
+            """Simulate a concurrent write before hard-link creation fails."""
             target.write_text(concurrent, encoding="utf-8")
             raise OSError(errno.EPERM, "hard links unsupported")
 
@@ -477,7 +465,7 @@ class CommitFindingsTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), concurrent)
 
     def test_commit_accepts_annotation_containing_fence_marker(self) -> None:
-        first = add_global_human_block(self.report(), "Decision.\n```\nrationale\n")
+        first = rf.add_global_human_block(self.report(), "Decision.\n```\nrationale\n")
         data = self.write_candidate(first)
         self.commit()
         target = self.repo / "FINDINGS.md"

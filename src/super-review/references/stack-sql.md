@@ -1,4 +1,4 @@
-# SQL and Query-System Deep Checks
+# SQL and query-system deep checks
 
 Review applicable handwritten SQL, query builders, ORM-generated query behavior, stored logic, analytics queries, and migration SQL for:
 

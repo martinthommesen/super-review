@@ -1,4 +1,4 @@
-# Mobile Client Deep Checks
+# Mobile client deep checks
 
 Review applicable first-party iOS, Android, cross-platform, and embedded mobile-client behavior for:
 

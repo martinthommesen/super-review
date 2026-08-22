@@ -1,14 +1,22 @@
-# super-review CLI
+# super-review command-line interface
 
-Consolidated command-line front-end for the shipped FINDINGS helpers. It replaces the earlier MCP companion (decision D15): there is no server and no ambient tool surface — every operation is an explicit shell invocation with explicit arguments, so nothing here can be reached by a host's auto-run machinery or by prompt injection.
+This package exposes the shipped FINDINGS helpers as a `super-review` command.
+It replaced the MCP companion under decision D15. There is no server or
+registered tool endpoint. Each operation requires a shell command and arguments.
 
-The CLI does **not** replace the portable contract in `SKILL.md`. The skill itself keeps invoking the helpers directly (`python3 -I "$SKILL_ROOT/scripts/<helper>.py"`); this package is a convenience wrapper around the same bytes.
+The CLI does not replace the portable contract in `SKILL.md`. The skill still
+invokes helpers directly with
+`python3 -I "$SKILL_ROOT/scripts/<helper>.py"`. This package calls the same code.
 
 ## Trust model
 
-- The trusted skill root is always explicit: `--skill-root /abs/path/to/super-review` or the `SUPER_REVIEW_SKILL_ROOT` environment variable. It is never inferred from the current working directory.
-- Helpers are resolved only from `<skill-root>/scripts/` by absolute path, with symlink and escape checks (`skill_loaders.py`), never from `sys.path` or the target repository.
-- Commits stay digest-gated, exact-byte, annotation-preserving, and atomic — the CLI adds no write path of its own; it forwards to `commit_findings.py`.
+- Supply the trusted skill root with `--skill-root /abs/path/to/super-review` or
+  `SUPER_REVIEW_SKILL_ROOT`. The CLI never infers it from the working directory.
+- `skill_loaders.py` resolves helpers by absolute path under
+  `<skill-root>/scripts/` and rejects symlinks and path escapes. It does not load
+  helpers from `sys.path` or the target repository.
+- The `commit` command delegates to `commit_findings.py`. It adds no second
+  write implementation.
 
 ## Install
 
@@ -29,34 +37,39 @@ super-review --skill-root /path/to/super-review/src/super-review validate --help
 
 ## Commands
 
-Each command forwards its remaining arguments to the underlying helper, so `-h` after a command prints that helper's full flag surface, and exit codes pass through unchanged (validate: 0 ok, 1 invalid, 2 usage; commit: 0 ok, 2 validation, 3 conflict, 4 I/O).
+Each command passes its remaining arguments to the helper. Put `-h` after the
+command to see its options. Exit codes pass through unchanged. `validate` uses
+0 for success, 1 for an invalid report, and 2 for usage errors. `commit` uses 0
+for success, 2 for validation, 3 for conflicts, and 4 for I/O errors.
 
 ```bash
-# Validate a candidate (or a committed report with --canonical-root):
+# Validate a candidate or committed report
 super-review --skill-root "$SKILL_ROOT" validate /tmp/FINDINGS.candidate.md
 super-review --skill-root "$SKILL_ROOT" validate --canonical-root /repo /repo/FINDINGS.md
 
-# Exact-byte snapshot of <repo-root>/FINDINGS.md (repo root must be absolute):
+# Snapshot <repo-root>/FINDINGS.md by exact bytes
 super-review --skill-root "$SKILL_ROOT" snapshot /repo --json --metadata-only
 super-review --skill-root "$SKILL_ROOT" snapshot /repo --out /tmp/current-findings.bytes
 
-# Digest-gated commit:
+# Commit only if the starting digest matches
 super-review --skill-root "$SKILL_ROOT" commit \
   --repo-root /repo --candidate /tmp/FINDINGS.candidate.md \
   --expected-sha256 MISSING
 
-# Deterministic record fingerprint:
+# Compute a record fingerprint
 super-review --skill-root "$SKILL_ROOT" fingerprint \
   --record-type "Defect or risk" --category SEC \
   --primary-component auth/session --identity-statement "session tokens never expire"
 ```
 
-`snapshot` takes a repository root, not a file path — the report path is always derived as `<repo-root>/FINDINGS.md`, so the command cannot be pointed at arbitrary files.
+`snapshot` accepts a repository root, not a file path. It always reads
+`<repo-root>/FINDINGS.md`.
 
 ## Development
 
 ```bash
-make cli-test        # from the repository root: uv sync --frozen, ruff, pytest
+make cli-test        # from the repository root; runs uv sync, ruff, and pytest
 ```
 
-The package is stdlib-only at runtime; dev dependencies (pytest, ruff) are pinned in `pyproject.toml` and locked in `uv.lock`.
+The runtime uses only the Python standard library. Development dependencies are
+pinned in `pyproject.toml` and locked in `uv.lock`.

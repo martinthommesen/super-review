@@ -1,6 +1,9 @@
-# PHASE 17 — BETTER OR DIFFERENT WAYS TO IMPLEMENT THE SYSTEM
+# Phase 17: better or different implementations
 
-Strict anti-filler rule: perform the alternatives analysis for every major subsystem or workflow, but do not manufacture options. Any unsupported option or field must say `Not applicable — <specific evidence-based reason>` or `Not established — <missing evidence>`. A supported `Keep as is` conclusion remains fully valid.
+Analyze alternatives for every major subsystem or workflow, but do not invent
+options. Use `Not applicable: <specific evidence-based reason>` or `Not
+established: <missing evidence>` for unsupported options or fields. "Keep as
+is" remains valid when evidence supports it.
 
 This phase is mandatory.
 
@@ -83,14 +86,14 @@ Examples:
 For each major subsystem or workflow, provide an alternatives analysis using this
 structure:
 
-CURRENT APPROACH
+## Current approach
 
 - Describe the current implementation.
 - Explain what it does well.
 - Explain why it may have been chosen.
 - Identify its actual limitations.
 
-OPTION A — KEEP AND HARDEN
+## Option A: keep and harden
 
 - Minimal changes.
 - Benefits.
@@ -99,7 +102,7 @@ OPTION A — KEEP AND HARDEN
 - Expected lifetime.
 - Correct-use conditions.
 
-OPTION B — INCREMENTAL REDESIGN
+## Option B: incremental redesign
 
 - Structural change (without replacing the entire subsystem).
 - Benefits.
@@ -109,7 +112,7 @@ OPTION B — INCREMENTAL REDESIGN
 - Testing requirements.
 - Rollback strategy.
 
-OPTION C — ALTERNATIVE APPROACH
+## Option C: alternative approach
 
 - Alternative design (a meaningfully different implementation).
 - Benefits.
@@ -120,14 +123,14 @@ OPTION C — ALTERNATIVE APPROACH
 - Dependency implications.
 - Migration complexity.
 
-OPTION D — CLEAN-SLATE IDEAL, WHEN USEFUL
+## Option D: clean-slate ideal, when useful
 
 - What would be designed differently without legacy constraints?
 - Which parts are worth approximating incrementally?
 - Which parts are not worth pursuing?
 - Why a full rewrite is or is not justified.
 
-RECOMMENDATION
+## Recommendation
 
 - Select the preferred option.
 - Explain why it is preferred.
@@ -137,6 +140,4 @@ RECOMMENDATION
 - State what should remain untouched.
 
 Do not force an alternative when the existing approach is already appropriate.
-“Keep as is” is a valid recommendation when supported by evidence.
-
-===============================================================================
+"Keep as is" is a valid recommendation when supported by evidence.

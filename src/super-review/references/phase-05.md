@@ -1,4 +1,4 @@
-# PHASE 5 — CORRECTNESS AND BUSINESS-LOGIC REVIEW
+# Phase 5: correctness and business-logic review
 
 Review all meaningful first-party implementation for:
 
@@ -71,5 +71,3 @@ For suspicious behavior:
 6. Inspect documentation.
 7. Inspect related historical comments where available.
 8. Establish intended behavior before labeling it a defect.
-
-===============================================================================

@@ -1,14 +1,4 @@
-"""Console entry point: ``super-review <command>`` over the skill-root helpers.
-
-The CLI is a thin dispatcher. Every subcommand forwards its remaining
-arguments verbatim to the corresponding bundled helper's own ``main``, so flag
-surfaces, output, and exit codes stay identical to direct
-``python3 -I "$SKILL_ROOT/scripts/<helper>.py"`` invocations (validate: 0/1/2;
-commit: 0/2/3/4). The trusted skill root is always explicit — ``--skill-root``
-or ``SUPER_REVIEW_SKILL_ROOT`` — and is never inferred from the current
-working directory. There is no server and no ambient tool surface: nothing
-runs unless invoked with explicit arguments.
-"""
+"""Dispatch super-review commands to helpers from an explicit skill root."""
 
 from __future__ import annotations
 
@@ -31,10 +21,10 @@ _HELPER_FILES = {
 _HELP = """\
 usage: super-review [--skill-root PATH] <command> [helper arguments...]
 
-Consolidated front-end for the super-review FINDINGS helpers. Each command
-forwards its remaining arguments verbatim to the bundled helper resolved from
-the trusted skill root; pass -h after a command to see that helper's full flag
-surface. Helper exit codes pass through unchanged.
+Command-line front end for the super-review FINDINGS helpers. Each command
+passes its remaining arguments to the bundled helper from the trusted skill
+root. Pass -h after a command to see that helper's options. Helper exit codes
+pass through unchanged.
 
 commands:
   validate     validate a FINDINGS.md candidate or committed report
@@ -52,7 +42,6 @@ options:
 
 
 def _print_help(stream: TextIO) -> None:
-    """Write the command-line usage and command help text to a stream."""
     stream.write(_HELP)
 
 
@@ -71,15 +60,7 @@ def _snapshot_target(repo_root: Path) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """
-    Dispatch a super-review command to its helper module.
-
-    Parameters:
-        argv (list[str] | None): Command-line arguments without the program name. If omitted, uses the process arguments.
-
-    Returns:
-        int: The helper's exit code, or `2` for invalid arguments, missing configuration, or helper-loading errors.
-    """
+    """Dispatch one command and return its helper's exit code."""
     arguments = list(sys.argv[1:] if argv is None else argv)
 
     skill_root: Path | None = None

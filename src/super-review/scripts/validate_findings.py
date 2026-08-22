@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a Super Review FINDINGS.md report.
-
-The validator is dependency-free and intentionally strict. It checks Markdown
-structure outside fenced code, canonical record schemas and values, deterministic
-fingerprints, the identifier registry, protected human blocks, report metadata,
-and summary/roadmap cross-reference invariants.
-"""
+"""Validate the structure and cross-references of a Super Review report."""
 
 from __future__ import annotations
 
@@ -561,29 +555,18 @@ def _line_error(line: int, message: str) -> str:
 
 
 def _ranges_overlap(left: tuple[int, int], right: tuple[int, int]) -> bool:
-    """Determine whether two inclusive integer ranges overlap.
-
-    Parameters:
-        left (tuple[int, int]): The first range's inclusive start and end.
-        right (tuple[int, int]): The second range's inclusive start and end.
-
-    Returns:
-        bool: `True` if the ranges share at least one value, `False` otherwise.
-    """
+    """Return whether two inclusive integer ranges overlap."""
     return left[0] <= right[1] and right[0] <= left[1]
 
 
 def scan_report_structure(data: bytes) -> StructureScan:
     """Scan exact report bytes with the single canonical structure grammar.
 
-    Both the validator and the safe writer parse fences and protected human
-    blocks through this scanner, so a report can never be structurally valid to
-    one and invalid to the other. Lines split on LF / CRLF / CR exactly as
-    ``bytes.splitlines``. A fence opened in normal text neutralizes markers
-    inside it; an open human block is opaque, so fence-looking lines inside an
-    annotation are content, never structure. Backtick-fence info strings cannot
-    contain a backtick (CommonMark), and a closing fence permits only trailing
-    spaces and tabs. Errors are collected, not raised.
+    The validator and writer both use this scanner. It follows
+    ``bytes.splitlines`` for LF, CRLF, and CR. Fences hide block markers, and
+    protected blocks treat fence-like lines as content. CommonMark backtick
+    info strings cannot contain a backtick. Closing fences allow only trailing
+    spaces and tabs. The scanner collects errors instead of raising them.
     """
     raw_lines = data.splitlines(keepends=True)
     errors: list[str] = []
@@ -685,14 +668,7 @@ def _decoded_scan_lines(data: bytes) -> list[str]:
 
 
 def _line_set(ranges: Iterable[tuple[int, int]]) -> set[int]:
-    """Return the set of line numbers covered by inclusive ranges.
-
-    Parameters:
-        ranges (Iterable[tuple[int, int]]): Inclusive line-number ranges.
-
-    Returns:
-        set[int]: The line numbers contained in the ranges.
-    """
+    """Expand inclusive ranges into line numbers."""
     result: set[int] = set()
     for start, end in ranges:
         result.update(range(start, end + 1))
@@ -719,16 +695,7 @@ def extract_human_blocks(text: str) -> dict[str, str]:
 def _extract_registry(
     lines: list[str], ignored_lines: set[int]
 ) -> tuple[dict | None, tuple[int, int] | None, list[str]]:
-    """
-    Extract and parse the report's registry block.
-
-    Parameters:
-        lines (list[str]): Report lines to inspect.
-        ignored_lines (set[int]): One-based line numbers excluded from registry detection and parsing.
-
-    Returns:
-        tuple[dict | None, tuple[int, int] | None, list[str]]: The registry object, its one-based start and end line range, and any validation errors.
-    """
+    """Parse the one registry block outside ignored line ranges."""
     starts = [
         i
         for i, line in enumerate(lines, start=1)
@@ -767,15 +734,7 @@ def _extract_registry(
 def _validate_registry(
     registry: dict | None,
 ) -> tuple[set[str], set[str], dict[str, str], list[str]]:
-    """
-    Validate registry structure, identifiers, fingerprints, retirement metadata, replacement relationships, and sequence counters.
-
-    Parameters:
-        registry (dict | None): Registry data to validate, or None when no registry is present.
-
-    Returns:
-        tuple[set[str], set[str], dict[str, str], list[str]]: Active IDs, retired IDs, active ID-to-fingerprint mappings, and validation error messages.
-    """
+    """Validate registry identities, replacements, and sequence counters."""
     errors: list[str] = []
     if registry is None:
         return set(), set(), {}, errors
@@ -909,11 +868,7 @@ def _validate_registry(
                 f"registry retired {record_id} status {status} requires at least one replacement ID"
             )
 
-    # Replacement chains must terminate: peel retired entries whose chains end
-    # (in an active ID, or a retired entry with no further retired
-    # replacements). Together with the known-ID check above this guarantees
-    # every chain reaches an active or terminally retired identity, so the
-    # non-empty remainder is exactly the set of IDs forming or feeding a cycle.
+    # Remove nodes whose chains terminate. Remaining nodes form or reach a cycle.
     chain_edges = {
         record_id: {
             replacement
@@ -1221,14 +1176,7 @@ def _placeholder_in_line(line: str) -> str | None:
 
 
 def _validate_option_sections(record: Record) -> list[str]:
-    """Validate the required fields and ordering of Options A–D for an improvement record.
-
-    Parameters:
-        record (Record): The improvement record whose option subsections are validated.
-
-    Returns:
-        list[str]: Validation error messages for missing, duplicated, empty, or improperly ordered option sections and fields.
-    """
+    """Validate improvement option fields and order."""
     errors: list[str] = []
     options = OPTION_FIELDS
     structural_lines = record.structural_body.splitlines()
@@ -1286,17 +1234,7 @@ def _validate_option_sections(record: Record) -> list[str]:
 def _validate_records(
     records: list[Record], active_ids: set[str], active_fingerprints: dict[str, str]
 ) -> tuple[dict[str, Record], list[str]]:
-    """
-    Validate canonical records against their schemas, registry entries, and deterministic fingerprints.
-
-    Parameters:
-        records (list[Record]): Parsed records to validate.
-        active_ids (set[str]): IDs that must have active canonical records in the registry.
-        active_fingerprints (dict[str, str]): Registry fingerprints keyed by active record ID.
-
-    Returns:
-        tuple[dict[str, Record], list[str]]: Records indexed by ID and validation errors.
-    """
+    """Validate records against their schemas and registry entries."""
     errors: list[str] = []
     by_id: dict[str, Record] = {}
     fingerprints_seen: dict[str, str] = {}
@@ -1398,11 +1336,7 @@ def _validate_records(
                 )
             )
 
-        # Every `Label: value` line in a record body must be a field this
-        # record type (and, for features, this decision) defines. Colon-led
-        # prose inside a field value parses as a field boundary, so it must be
-        # fenced, indented, or rephrased. Skipped for an invalid Decision,
-        # which already errored and leaves the allowed set undefined.
+        # An invalid Decision has no defined field set and already reports an error.
         if record_type != "Feature decision" or decision in FEATURE_DECISIONS:
             allowed_fields = set(required_fields)
             if record_type == "Improvement or alternative":
@@ -1677,14 +1611,7 @@ def _is_absolute_canonical_root(value: str) -> bool:
 
 
 def _validate_report_metadata(section_one: str) -> list[str]:
-    """Validate Executive Summary metadata fields, formats, and cross-field consistency.
-
-    Parameters:
-        section_one (str): The text of the Executive Summary section.
-
-    Returns:
-        list[str]: Validation error messages, or an empty list when the metadata is valid.
-    """
+    """Validate Executive Summary metadata and cross-field rules."""
     errors: list[str] = []
     section_lines = section_one.splitlines()
     values = _summary_metadata_values(section_lines)
@@ -1794,8 +1721,7 @@ def _validate_report_metadata(section_one: str) -> list[str]:
             "Executive Summary Material limitations must explain a Partial or Blocked review"
         )
 
-    # Cross-field consistency, applied only when the involved values are
-    # individually well-formed so malformed values produce exactly one error.
+    # Check relationships only after each value passes its own format rule.
     revalidated_missing = "No — file did not exist"
     revalidated_well_formed = (
         revalidated == "Yes"
@@ -1822,15 +1748,7 @@ def _validate_report_metadata(section_one: str) -> list[str]:
 
 
 def validate_text(text: str) -> ValidationResult:
-    """
-    Validate the complete text of a Super Review findings report.
-
-    Parameters:
-        text (str): Report content to validate.
-
-    Returns:
-        ValidationResult: Collected validation errors and warnings.
-    """
+    """Validate a complete Super Review report."""
     errors: list[str] = []
     warnings: list[str] = []
     if "\x00" in text:
@@ -2020,12 +1938,7 @@ def _read_path_no_follow(path: Path) -> tuple[bytes | None, str | None]:
 
 
 def stated_canonical_root(text: str) -> str | None:
-    """
-    Extracts the repository identity declared in the report's Executive Summary metadata.
-
-    Returns:
-        str | None: The stated canonical root, or `None` when the report structure or metadata is invalid or absent.
-    """
+    """Read the Canonical root value from a structurally valid report."""
     data = text.encode("utf-8")
     scan = scan_report_structure(data)
     if scan.errors:
@@ -2106,7 +2019,7 @@ class Snapshot:
 
         IDs are a convenience for concurrency bookkeeping. Agents that need
         protected annotation content must use ``data`` (exact bytes), not this
-        list — ``extract_human_blocks`` reconstructs text with ``\\n`` and is
+        list. ``extract_human_blocks`` reconstructs text with ``\\n`` and is
         not byte-exact.
         """
         if self.data is None:
@@ -2202,11 +2115,11 @@ def minimal_valid_report() -> str:
             ]
         ),
         8: "\n\n".join(
-            f"## {name}\n\nNo current canonical records supported — test fixture."
+            f"## {name}\n\nNo current canonical records supported: test fixture."
             for name in FEATURE_SUBSECTIONS
         ),
         14: "\n\n".join(
-            f"## {name}\n\nNo current canonical records supported — test fixture."
+            f"## {name}\n\nNo current canonical records supported: test fixture."
             for name in ROADMAP_SUBSECTIONS
         ),
     }
@@ -2221,7 +2134,7 @@ def minimal_valid_report() -> str:
         chunks.append("")
         chunks.append(
             section_bodies.get(
-                number, "No current canonical records supported — test fixture."
+                number, "No current canonical records supported: test fixture."
             )
         )
         chunks.append("")
@@ -2258,12 +2171,7 @@ def run_self_test() -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """
-    Create the command-line argument parser for report validation, snapshotting, and self-tests.
-
-    Returns:
-        argparse.ArgumentParser: Parser configured with the command-line options supported by the validator.
-    """
+    """Create the report validator's argument parser."""
     parser = argparse.ArgumentParser(
         description="Validate a Super Review FINDINGS.md report."
     )
@@ -2307,16 +2215,7 @@ def build_parser() -> argparse.ArgumentParser:
 def _snapshot_payload(
     result: Snapshot, *, include_content: bool = True
 ) -> dict[str, object]:
-    """
-    Build a snapshot payload with status, digest, size, protected-block IDs, and optional report content.
-
-    Parameters:
-        result (Snapshot): Snapshot data to serialize.
-        include_content (bool): Whether to include the report content when snapshot data is available.
-
-    Returns:
-        dict[str, object]: Snapshot metadata and, when requested, UTF-8 text or base64-encoded report bytes.
-    """
+    """Serialize snapshot metadata and optional report content."""
     payload: dict[str, object] = {
         "status": result.status,
         "digest": result.digest,
@@ -2392,15 +2291,7 @@ def _write_snapshot_bytes(out_path: Path, report_root: Path, data: bytes) -> str
 
 
 def main(argv: list[str] | None = None) -> int:
-    """
-    Run the FINDINGS report validator or execute the self-test command.
-
-    Parameters:
-        argv (list[str] | None): Optional command-line arguments. When omitted, arguments are read from the process command line.
-
-    Returns:
-        int: `0` for success, `1` for validation or operational failure, or `2` for invalid command-line usage.
-    """
+    """Run validation, snapshot, or self-test mode."""
     args = build_parser().parse_args(argv)
     if args.self_test:
         return run_self_test()

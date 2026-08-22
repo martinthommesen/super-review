@@ -1,6 +1,6 @@
-# Non-Negotiable Review Principles
+# Non-negotiable review principles
 
-1. INSPECT BEFORE CONCLUDING
+## 1. Inspect before concluding
 
 Do not reach conclusions from filenames, isolated snippets, comments, or a
 single layer of an interface.
@@ -21,7 +21,7 @@ Trace:
 - Cleanup paths.
 - Runtime assumptions.
 
-2. USE EVIDENCE, NOT SPECULATION
+## 2. Use evidence, not speculation
 
 Every confirmed finding must include concrete repository evidence.
 
@@ -39,7 +39,7 @@ Prefer:
 Do not state that something is unused, slow, insecure, or low-value without
 supporting evidence.
 
-3. DISTINGUISH DEFECTS FROM IMPROVEMENTS
+## 3. Distinguish defects from improvements
 
 Classify recommendations with the canonical `Classification` values.
 
@@ -76,7 +76,7 @@ Experiment, or Investigate) instead.
 
 Do not present a subjective preference as a correctness defect.
 
-4. TRACE IMPORTANT BEHAVIOR END TO END
+## 4. Trace important behavior end to end
 
 For important workflows, follow data and control flow from external input
 through:
@@ -100,7 +100,7 @@ through:
 - Cleanup.
 - Compensation and recovery.
 
-5. REVIEW FAILURE PATHS AS SERIOUSLY AS SUCCESS PATHS
+## 5. Review failure paths as seriously as success paths
 
 Inspect behavior under:
 
@@ -127,7 +127,7 @@ Inspect behavior under:
 - Corrupt or legacy data.
 - Deployment during active traffic.
 
-6. SEARCH FOR SYSTEMIC CAUSES
+## 6. Search for systemic causes
 
 When multiple findings share a root cause, consolidate them into one systemic
 finding and list all affected locations.
@@ -135,7 +135,7 @@ finding and list all affected locations.
 Do not report twenty copies of the same mistake as twenty independent design
 issues.
 
-7. RESPECT REAL COMPATIBILITY CONTRACTS
+## 7. Respect real compatibility contracts
 
 Do not casually recommend breaking:
 
@@ -156,7 +156,7 @@ Do not casually recommend breaking:
 When recommending a breaking change, include a migration, deprecation, rollback,
 and compatibility strategy.
 
-8. DO NOT WORSHIP THE CURRENT DESIGN
+## 8. Do not worship the current design
 
 Repository conventions are evidence, not proof that the design is optimal.
 
@@ -169,7 +169,7 @@ Identify when an established pattern is:
 - Inconsistently applied.
 - Better replaced with a simpler pattern.
 
-9. DO NOT CHASE NOVELTY
+## 9. Do not chase novelty
 
 Do not recommend:
 
@@ -185,7 +185,7 @@ Do not recommend:
 - Configuration that no current requirement needs.
 - Features unsupported by user, workflow, risk, or operational evidence.
 
-10. PREFER THE SMALLEST EFFECTIVE IMPROVEMENT
+## 10. Prefer the smallest effective improvement
 
 For each recommendation, consider:
 
@@ -198,7 +198,7 @@ For each recommendation, consider:
 Recommend the least disruptive option that adequately solves the underlying
 problem.
 
-11. STATE UNCERTAINTY CLEARLY
+## 11. State uncertainty clearly
 
 Use the canonical `Confidence` values:
 
@@ -211,7 +211,7 @@ Use the canonical `Confidence` values:
 
 Explain what evidence would raise or lower confidence.
 
-12. PROTECT SENSITIVE INFORMATION
+## 12. Protect sensitive information
 
 Never reproduce:
 
@@ -227,7 +227,7 @@ Never reproduce:
 
 Refer to the location and type safely.
 
-13. DO NOT CONFUSE VOLUME WITH COVERAGE
+## 13. Do not confuse volume with coverage
 
 Exhaustive review means all meaningful first-party areas are considered.
 
@@ -242,9 +242,7 @@ It does not require wasting effort line-by-line on:
 Review the boundaries, generation sources, configuration, and risks of those
 areas without treating them as ordinary handwritten application code.
 
-===============================================================================
-REQUIRED REVIEW PROCESS
-===============================================================================
+## Required review process
 
 Complete the following phases.
 

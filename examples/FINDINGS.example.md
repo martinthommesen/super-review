@@ -32,19 +32,19 @@ Material limitations: None
 
 # 2. Repository and System Overview
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 3. Coverage Ledger
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 4. Architecture and Data-Flow Map
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 5. Top Findings
 
-- COR-001 — [COR-001] Boundary validation permits an invalid state
+- COR-001: [COR-001] Boundary validation permits an invalid state
 
 # 6. Detailed Findings
 
@@ -71,7 +71,7 @@ Confidence: Confirmed
 Affected components: Request parser, domain service, and persisted records.
 
 Evidence:
-- `src/request.py:10-24` — validation omits the state invariant.
+- `src/request.py:10-24`: validation omits the state invariant.
 
 Current behavior: The request reaches the domain service without the required invariant.
 
@@ -94,7 +94,7 @@ Recommended action: Validate the invariant at the trust boundary and retain doma
 Alternative approaches:
 1. Boundary and domain validation.
 2. Domain-only validation with typed construction.
-3. Not applicable — keeping the gap is unsafe.
+3. Not applicable: keeping the gap is unsafe.
 
 Preferred option: Boundary and domain validation because it fails early and preserves defense in depth.
 
@@ -104,13 +104,13 @@ Compatibility and migration: No public shape change; invalid requests begin fail
 
 Validation: Unit and integration regression tests for invalid and valid states.
 
-Effort: Small — one boundary and focused tests.
+Effort: Small: one boundary and focused tests.
 
-Risk of the proposed change: Low — behavior changes only for invalid input.
+Risk of the proposed change: Low: behavior changes only for invalid input.
 
 Dependencies: None.
 
-Open questions: Not applicable — intended invariant is established by schema and tests.
+Open questions: Not applicable: intended invariant is established by schema and tests.
 
 # 7. Better and Different Ways to Implement the System
 
@@ -137,7 +137,7 @@ Confidence: High
 Affected components: Pipeline stages and their callers.
 
 Evidence:
-- `src/pipeline.py:20-80` — normalization is repeated across stages.
+- `src/pipeline.py:20-80`: normalization is repeated across stages.
 
 Current approach: Each stage normalizes the same input independently.
 
@@ -215,47 +215,47 @@ Expected benefit: Avoids premature churn while preserving a bounded future path.
 
 Implementation outline: No current code change; keep parity tests and revisit at the trigger.
 
-Compatibility and migration: Not applicable — no change is recommended now.
+Compatibility and migration: Not applicable: no change is recommended now.
 
 Validation: Reassess when another stage duplicates normalization.
 
-Effort: Small — investigation only.
+Effort: Small: investigation only.
 
-Risk of the proposed change: Low — the current recommendation is to defer.
+Risk of the proposed change: Low: the current recommendation is to defer.
 
 Dependencies: Evidence of another consumer or material drift.
 
-Open questions: Not applicable — the decision threshold is explicit.
+Open questions: Not applicable: the decision threshold is explicit.
 
 # 8. Feature Portfolio Recommendations
 
 ## 8.1 Add
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## 8.2 Improve
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## 8.3 Simplify
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## 8.4 Merge
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## 8.5 Replace
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## 8.6 Deprecate
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## 8.7 Remove
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## 8.8 Keep
 
@@ -287,7 +287,7 @@ Problem or opportunity: The capability provides traceability for privileged chan
 
 Repository evidence: Routes, persistence, authorization tests, and operator documentation.
 
-Current workaround: Not applicable — the capability already exists.
+Current workaround: Not applicable: the capability already exists.
 
 Consequence of doing nothing: The current traceability remains available.
 
@@ -303,13 +303,13 @@ User or operator workflow: Authorized operators search and inspect immutable ent
 
 Required permissions: Existing least-privilege operator permission.
 
-Data-model changes: Not applicable — preserve the existing schema.
+Data-model changes: Not applicable: preserve the existing schema.
 
-API changes: Not applicable — preserve the existing contract.
+API changes: Not applicable: preserve the existing contract.
 
-UI changes: Not applicable — preserve the existing interface.
+UI changes: Not applicable: preserve the existing interface.
 
-Background-processing changes: Not applicable — no background processing is involved.
+Background-processing changes: Not applicable: no background processing is involved.
 
 Security implications: Preserve authorization, integrity, and sensitive-field redaction.
 
@@ -327,14 +327,14 @@ Usage evidence available: Reachable routes, tests, and operator docs.
 
 Usage evidence missing: Production frequency is unavailable and not required for preservation.
 
-Maintenance burden: Bounded to one service and one UI surface.
+Maintenance burden: Bounded to one service and one interface.
 
 Overlap with other features: No material overlap established.
 
 Alternatives considered:
 1. Keep current design.
-2. Replace storage — unsupported.
-3. Remove — unsafe and unsupported.
+2. Replace storage: unsupported.
+3. Remove: unsafe and unsupported.
 
 Dependencies: Existing authorization and retention controls.
 
@@ -342,11 +342,11 @@ Implementation touchpoints: Authorization tests and audit-history service.
 
 Test strategy: Integration tests for permission, ordering, redaction, and retention.
 
-Migration strategy: Not applicable — no migration.
+Migration strategy: Not applicable: no migration.
 
-Rollout or deprecation plan: Not applicable — preserve current behavior.
+Rollout or deprecation plan: Not applicable: preserve current behavior.
 
-Rollback strategy: Not applicable — no behavioral change.
+Rollback strategy: Not applicable: no behavioral change.
 
 Data-retention implications: Preserve the established retention policy.
 
@@ -354,9 +354,9 @@ Success indicators: Existing workflows and controls continue to pass.
 
 Reconsideration or removal criteria: Reconsider only with replacement traceability and consumer evidence.
 
-Final deletion criteria: Not applicable — keep decision.
+Final deletion criteria: Not applicable: keep decision.
 
-Effort: Small — regression coverage only.
+Effort: Small: regression coverage only.
 
 Risks: Accidental weakening during unrelated refactors.
 
@@ -370,61 +370,61 @@ Future-refactor constraints: Do not merge it with mutable activity feeds.
 
 ## 8.9 Experiment or Investigate
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 9. Testing and Validation Gaps
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 10. Security and Privacy Summary
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 11. Performance, Reliability, and Operations Summary
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 12. Dependency, Build, Deployment, and Supply-Chain Summary
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 13. Documentation and Developer-Experience Summary
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 14. Prioritized Roadmap
 
 ## Now
 
-- COR-001 — fixture roadmap item.
+- COR-001: fixture roadmap item.
 
 ## Next
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## Later
 
-- FEAT-001 — fixture roadmap item.
+- FEAT-001: fixture roadmap item.
 
 ## Investigate
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 ## Do Not Pursue
 
-- IMP-001 — fixture roadmap item.
+- IMP-001: fixture roadmap item.
 
 # 15. Suggested Implementation Sequence
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 16. Validation Performed
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 17. Open Questions and Missing Evidence
 
-No current canonical records supported — test fixture.
+No current canonical records supported: test fixture.
 
 # 18. Positive Patterns Worth Preserving
 

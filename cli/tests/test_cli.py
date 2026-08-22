@@ -28,15 +28,7 @@ from super_review_cli.skill_loaders import SkillLoadError, load_helper  # noqa: 
 
 
 def run_cli(*argv: str) -> tuple[int, str, str]:
-    """
-    Execute the CLI with captured standard output and error streams.
-
-    Parameters:
-        argv (str): Command-line arguments passed to the CLI.
-
-    Returns:
-        tuple[int, str, str]: The exit code, captured standard output, and captured standard error.
-    """
+    """Run the CLI and capture both output streams."""
     stdout = io.StringIO()
     stderr = io.StringIO()
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
@@ -45,14 +37,7 @@ def run_cli(*argv: str) -> tuple[int, str, str]:
 
 
 def with_root(*argv: str) -> tuple[int, str, str]:
-    """Run the CLI with the configured absolute skill root.
-
-    Parameters:
-        argv (str): Command-line arguments passed to the CLI.
-
-    Returns:
-        tuple[int, str, str]: The exit code, standard output, and standard error.
-    """
+    """Run the CLI with the test skill root."""
     return run_cli("--skill-root", str(SKILL_ROOT), *argv)
 
 
@@ -80,15 +65,7 @@ class CliTests(unittest.TestCase):
         self.temp.cleanup()
 
     def write_candidate(self, text: str | None = None) -> Path:
-        """
-        Write a candidate report to the test repository.
-
-        Parameters:
-                text (str | None): Report content to write. If omitted, builds a report for the repository.
-
-        Returns:
-                Path: The path to the written candidate report.
-        """
+        """Write a candidate report outside the test repository."""
         candidate = self.base / "candidate.md"
         candidate.write_text(
             text
@@ -120,7 +97,7 @@ class CliTests(unittest.TestCase):
 
     def test_skill_root_resolution_oserror_maps_to_exit_2(self) -> None:
         # A root whose strict resolution fails after the lstat checks (removed
-        # in between, unreadable parent, dead network mount) must surface as
+        # in between, unreadable parent, dead network mount) must appear as
         # the documented usage exit code, never as a traceback.
         with mock.patch.object(
             Path, "resolve", side_effect=OSError("transport endpoint disconnected")

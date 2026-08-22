@@ -1,4 +1,4 @@
-# Template D — Positive pattern
+# Template D: positive pattern
 
 Use this for important behavior that should remain and serve as a pattern elsewhere.
 

@@ -1,13 +1,16 @@
-# Security Policy
+# Security policy
 
-## Security-sensitive surfaces
+## Security-sensitive components
 
 The most sensitive components are:
 
-- `src/super-review/scripts/commit_findings.py` — validates and atomically replaces a repository-root report;
-- `src/super-review/scripts/validate_findings.py` — enforces report structure and cross-reference integrity;
-- `src/super-review/scripts/finding_fingerprint.py` — defines stable canonical identity;
-- `src/super-review/references/command-safety.md` — controls execution of untrusted repository commands;
+- `src/super-review/scripts/commit_findings.py` validates and atomically replaces
+  a repository-root report.
+- `src/super-review/scripts/validate_findings.py` enforces report structure and
+  cross-reference integrity.
+- `src/super-review/scripts/finding_fingerprint.py` defines stable record identity.
+- `src/super-review/references/command-safety.md` controls execution of untrusted
+  repository commands.
 - repository build and extraction verification in `scripts/build.py` and `scripts/verify_dist.py`.
 
 ## Threat model
@@ -32,7 +35,7 @@ Do not include live credentials, customer data, production secrets, or unnecessa
 ## Secret hygiene
 
 This workbench and the shipped skill require no runtime secrets or environment
-variables. [`.env.example`](.env.example) documents that empty surface; local
+variables. [`.env.example`](.env.example) records that empty contract. Local
 `.env` files are gitignored. CI runs gitleaks on every push and pull request
 (see `.github/workflows/ci.yml`). Known false positives for template placeholders
 are listed in `.gitleaksignore`.

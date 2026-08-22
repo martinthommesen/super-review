@@ -1,4 +1,4 @@
-# Go Deep Checks
+# Go deep checks
 
 Review applicable first-party Go behavior for:
 

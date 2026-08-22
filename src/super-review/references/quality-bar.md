@@ -1,4 +1,4 @@
-# Quality Bar, Anti-Patterns, and Final Gates
+# Quality bar and final gates
 
 Load this file only after the phase work and candidate report are complete.
 
@@ -24,7 +24,7 @@ The review is not complete unless it:
 - Records validation performed and validation not performed.
 - Identifies positive patterns worth preserving.
 - Produces a dependency-aware, prioritized roadmap.
-- Completes phases 0–22 in order and records the reason for any inapplicable, sampled, excluded, or unvalidated area.
+- Completes phases 0 through 22 in order and records the reason for any inapplicable, sampled, excluded, or unvalidated area.
 - Revalidates every existing report claim before merging new results.
 - Performs current-repository discovery independently of the old report.
 - Uses separate canonical records for defects and risks, improvements and alternatives, feature decisions, and positive patterns.
@@ -42,8 +42,8 @@ Do not:
 
 - Produce a generic checklist with no repository-specific conclusions.
 - Report formatting preferences as major findings.
-- Recommend “add more tests” without naming exact missing behavior.
-- Recommend “improve error handling” without identifying concrete failure paths.
+- Recommend "add more tests" without naming exact missing behavior.
+- Recommend "improve error handling" without identifying concrete failure paths.
 - Recommend caching without identifying repeated expensive work and invalidation requirements.
 - Recommend microservices without a concrete scaling, ownership, deployment, or isolation need.
 - Recommend combining services without analyzing deployment and ownership consequences.
@@ -69,7 +69,7 @@ Do not:
 - Suggest broad abstractions with no demonstrated consumers.
 - Preserve unnecessary complexity solely because it is established.
 - Replace working code without demonstrating material benefit.
-- Manufacture options A–D or feature decisions to satisfy a template.
+- Manufacture options A through D or feature decisions to satisfy a template.
 - Omit a field silently when `Not applicable` or `Not established` is the truthful answer.
 - Blindly append beneath stale report content.
 - Reuse a retired ID.
@@ -93,7 +93,8 @@ Before writing the repository file:
 5. Confirm the candidate contains every protected human block from the latest current report exactly.
 6. Confirm each Critical and High defect or risk appears in `# 5. Top Findings` and `# 14. Prioritized Roadmap`.
 7. Confirm every roadmap and summary ID resolves to one active canonical record.
-8. Confirm retired IDs occur only in the registry, validation history, or explicit supersession references—not as active work.
+8. Confirm retired IDs occur only in the registry, validation history, or
+   explicit supersession references, never as active work.
 
 ## Safe-write gate
 
