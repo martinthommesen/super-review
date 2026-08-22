@@ -2370,6 +2370,25 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+        if args.out is not None:
+            # The reviewed tree's sole permitted modification is FINDINGS.md
+            # itself; the snapshot copy must land outside the repository that
+            # the snapshot path lives in.
+            report_path = args.path.expanduser()
+            if not report_path.is_absolute():
+                report_path = Path.cwd() / report_path
+            report_root = report_path.parent.resolve(strict=False)
+            out_path = args.out.expanduser()
+            if not out_path.is_absolute():
+                out_path = Path.cwd() / out_path
+            out_resolved = out_path.parent.resolve(strict=False) / out_path.name
+            if out_resolved.is_relative_to(report_root):
+                print(
+                    "error: --out must be outside the reviewed repository "
+                    f"({report_root})",
+                    file=sys.stderr,
+                )
+                return 2
         try:
             result = snapshot(args.path)
         except SnapshotError as exc:

@@ -382,6 +382,49 @@ class CommitFindingsTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), expected_bytes)
         self.assertEqual(os.stat(target).st_mode & 0o777, 0o644)
 
+    def test_fallback_failure_leaves_no_partial_report(self) -> None:
+        self.write_candidate()
+        target = self.repo / "FINDINGS.md"
+        with (
+            mock.patch.object(
+                cf.os,
+                "link",
+                side_effect=OSError(errno.EPERM, "hard links unsupported"),
+            ),
+            mock.patch.object(
+                cf.os, "replace", side_effect=OSError(errno.EIO, "device error")
+            ),
+        ):
+            with self.assertRaises(OSError):
+                self.commit()
+        # The placeholder is cleaned up; the visible path never held a
+        # partially written candidate.
+        self.assertFalse(target.exists())
+
+    def test_fallback_cleanup_spares_foreign_replacement(self) -> None:
+        self.write_candidate()
+        target = self.repo / "FINDINGS.md"
+        foreign = b"foreign writer content\n"
+        foreign_source = self.base / "foreign.md"
+
+        def swap_then_fail(src, dst, *args, **kwargs):
+            foreign_source.write_bytes(foreign)
+            os.rename(foreign_source, target)
+            raise OSError(errno.EIO, "device error")
+
+        with (
+            mock.patch.object(
+                cf.os,
+                "link",
+                side_effect=OSError(errno.EPERM, "hard links unsupported"),
+            ),
+            mock.patch.object(cf.os, "replace", side_effect=swap_then_fail),
+        ):
+            with self.assertRaises(OSError):
+                self.commit()
+        # The identity-guarded cleanup must not delete the other writer's file.
+        self.assertEqual(target.read_bytes(), foreign)
+
     def test_fallback_creation_detects_concurrent_writer(self) -> None:
         self.write_candidate()
         target = self.repo / "FINDINGS.md"

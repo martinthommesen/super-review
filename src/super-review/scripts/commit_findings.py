@@ -499,6 +499,10 @@ def commit_bytes(
                         # O_CREAT|O_EXCL create below is equally atomic.
                         created_via_link = False
                 if not created_via_link:
+                    # Atomically claim the name with an empty exclusive
+                    # placeholder, then atomically replace it with the fully
+                    # written, fsynced temp file. A crash can leave an empty
+                    # placeholder behind but never a partially written report.
                     creation_flags = (
                         os.O_WRONLY
                         | os.O_CREAT
@@ -507,22 +511,29 @@ def commit_bytes(
                         | getattr(os, "O_BINARY", 0)
                     )
                     try:
-                        creation_fd = os.open(target, creation_flags, 0o644)
+                        placeholder_fd = os.open(target, creation_flags, 0o644)
                     except FileExistsError as exc:
                         raise ConflictError(
                             "FINDINGS.md appeared before creation; refusing to overwrite it"
                         ) from exc
                     try:
-                        _set_mode(creation_fd, target, 0o644)
-                        with os.fdopen(creation_fd, "wb", closefd=True) as handle:
-                            handle.write(candidate_bytes)
-                            handle.flush()
-                            os.fsync(handle.fileno())
+                        _set_mode(placeholder_fd, target, 0o644)
+                        placeholder_info = os.fstat(placeholder_fd)
+                    finally:
+                        os.close(placeholder_fd)
+                    try:
+                        os.replace(temp_path, target)
                     except BaseException:
+                        # Best-effort cleanup: remove the placeholder only
+                        # while the path still is our placeholder; never
+                        # delete a file another writer put there meanwhile.
                         with contextlib.suppress(OSError):
-                            os.unlink(target)
+                            current_info = os.lstat(target)
+                            if _same_identity(placeholder_info, current_info):
+                                os.unlink(target)
                         raise
-                temp_path.unlink()
+                else:
+                    temp_path.unlink()
             else:
                 os.replace(temp_path, target)
             _fsync_directory(root)

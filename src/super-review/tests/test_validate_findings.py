@@ -654,7 +654,9 @@ Classification: Arbitrary
 
     def test_snapshot_cli_metadata_only_and_out(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "FINDINGS.md"
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
             data = rf.build_report().replace("\n", "\r\n").encode("utf-8")
             path.write_bytes(data)
             out = Path(temp_dir) / "snapshot.bin"
@@ -698,6 +700,21 @@ Classification: Arbitrary
                 stdout.close()
             self.assertIsNone(payload["content"])
             self.assertEqual(payload["size"], len(data))
+
+            inside = repo / "copy.bin"
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stderr(stderr):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(inside), str(path)]
+                    )
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stderr.close()
+            self.assertEqual(code, 2, "--out inside the reviewed tree must refuse")
+            self.assertIn("outside the reviewed repository", message)
+            self.assertFalse(inside.exists())
 
     def test_snapshot_flags_require_snapshot_mode(self) -> None:
         stderr = tempfile.TemporaryFile(mode="w+")
