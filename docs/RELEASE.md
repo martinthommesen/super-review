@@ -71,3 +71,12 @@ Confirm the archive has one top-level `super-review/` directory and contains no 
 ## 8. Publish manually
 
 Publishing is intentionally outside repository automation. Push the verified marketplace catalogs and plugin manifests together with the matching skill version. For direct-skill distribution, use the approved destination and process, preserve the ZIP bytes and checksum, and do not rebuild between verification and upload.
+
+## 9. Tag the release
+
+After the release commit is on the default branch, create an immutable annotated tag so marketplace consumers can pin exact revisions (for example Codex `--ref`):
+
+```bash
+git tag -a vX.Y.Z -m "super-review X.Y.Z"
+git push origin vX.Y.Z
+```

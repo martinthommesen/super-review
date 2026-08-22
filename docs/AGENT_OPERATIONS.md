@@ -65,7 +65,7 @@ Report what changed, what passed, and any validation that could not run.
 
 ## Versioning and release
 
-- Keep `VERSION`, `pyproject.toml`, the `Version:` line in `SKILL.md`, and `CHANGELOG.md` consistent.
+- Keep every enforced version location consistent: `VERSION`, `pyproject.toml`, the `Version:` line in `SKILL.md`, `CHANGELOG.md`, the README version sentence, and all versioned plugin/marketplace manifests (full list: `docs/RELEASE.md` step 1; enforced by `tests/test_repository.py`).
 - Bump patch for compatible fixes, minor for compatible capability/schema additions, and major for intentional incompatible report or invocation changes.
 - Build only through `scripts/build.py`; it creates a deterministic ZIP and checksum.
 - Follow `docs/RELEASE.md`. Release tooling must remain local and side-effect-free beyond generated `dist/` files.

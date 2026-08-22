@@ -1,0 +1,22 @@
+# Automated dependency updates. The root dev pins are dual-pinned: any bump to
+# requirements-dev.txt must land together with the matching change to
+# [dependency-groups].dev in pyproject.toml (and vice versa) or the parity
+# regression in tests/test_repository.py fails CI.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directory: /cli
+    schedule:
+      interval: weekly

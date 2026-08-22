@@ -1,4 +1,3 @@
-# False positives: validate_findings.py parses "<token>" placeholders in
-# FINDINGS.md templates; no secrets involved.
-src/super-review/scripts/validate_findings.py:shell-export-secret:486
-src/super-review/scripts/validate_findings.py:shell-export-secret:1081
+# No suppressions are currently required. When gitleaks reports a false
+# positive, record its fingerprint here in the commit-scoped form the CI
+# history scan matches: <commit-sha>:<path>:<rule-id>:<line>.

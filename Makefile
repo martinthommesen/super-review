@@ -58,7 +58,11 @@ root = Path('.'); \
 [p.unlink(missing_ok=True) for pat in ('*.pyc', '*.pyo') for p in root.rglob(pat) if '.venv' not in p.parts]"
 
 spec:
-	$(PYTHON_ENV) $(PYTHON) scripts/spec_validate.py
+	@if command -v $(UV) >/dev/null 2>&1; then \
+	  $(PYTHON_ENV) $(UV) run python scripts/spec_validate.py; \
+	else \
+	  $(PYTHON_ENV) $(PYTHON) scripts/spec_validate.py; \
+	fi
 
 build:
 	$(PYTHON_ENV) $(PYTHON) scripts/build.py --output $(ARTIFACT)

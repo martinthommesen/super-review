@@ -19,4 +19,4 @@ The source under `src/super-review/` was imported from the previously verified 1
 6d5f535b60f71bab1b21dac3eeaf1e66f3206adb277550b5d3fbfe3df8778544
 ```
 
-The workbench's deterministic builder may produce a different archive byte hash because ZIP metadata and ordering are normalized, while extracted file bytes remain identical to the imported source.
+At import time the workbench's deterministic builder produced a different archive byte hash because ZIP metadata and ordering are normalized, while extracted file bytes were identical to the imported 1.2.0 source. Releases after 1.2.0 intentionally modify `src/super-review/`; `CHANGELOG.md` records those changes.

@@ -109,9 +109,13 @@ def verify(artifact: Path, *, run_tests: bool = True) -> str:
                 )
             archive_mode = (seen[relative].external_attr >> 16) & 0o777
             source_mode = stat.S_IMODE(source.stat().st_mode)
-            if archive_mode != source_mode:
+            # The builder normalizes modes to git's model (0644/0755 by
+            # executable bit); verify against that expectation, not the
+            # umask-dependent working-tree mode.
+            normalized_mode = 0o755 if source_mode & 0o111 else 0o644
+            if archive_mode != normalized_mode:
                 raise RuntimeError(
-                    f"mode mismatch for {relative}: source={oct(source_mode)}, archive={oct(archive_mode)}"
+                    f"mode mismatch for {relative}: expected={oct(normalized_mode)}, archive={oct(archive_mode)}"
                 )
             expected_executable = relative in EXECUTABLE_PATHS
             if bool(archive_mode & 0o111) != expected_executable:

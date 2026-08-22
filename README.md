@@ -126,7 +126,7 @@ python3 -I "$SKILL_ROOT/scripts/commit_findings.py" --help
 
 `companion/` is an optional typed MCP front-end over those helpers. It is **not** in the portable skill ZIP. Default to the skill-root CLI; use the companion only with host-attested active-server provenance and user affirmation (decision D14), and always post-validate commits via the CLI. See [`companion/README.md`](companion/README.md).
 
-Cursor users can install this repository as a Cursor plugin (user user-level) to get the skill and companion together; see [Cursor](#cursor) above.
+Cursor users can install this repository as a Cursor plugin (user-level) to get the skill and companion together; see [Cursor](#cursor) above.
 
 ## This repository
 

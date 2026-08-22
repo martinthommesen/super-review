@@ -18,4 +18,4 @@ The 1.2.0 revision moved compatibility text into the body, used minimal frontmat
 
 ## Workbench packaging
 
-This repository wrapper adds reproducible local development, deterministic release creation, clean-room archive verification, CI, source provenance, maintainer documentation, and repository-level tests without changing the 1.2.0 skill source.
+This repository wrapper added reproducible local development, deterministic release creation, clean-room archive verification, CI, source provenance, maintainer documentation, and repository-level tests without changing the then-current 1.2.0 skill source. Later releases evolve the skill source itself; see `CHANGELOG.md`.
