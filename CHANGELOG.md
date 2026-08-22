@@ -11,7 +11,7 @@ All notable changes to `super-review` are recorded here.
 - Unknown-field validation: every `Label: value` line in a record body must be a field defined for that record type (SEC-only fields on `SEC` records, decision-specific fields for the record's `Decision`, Options A–D fields on improvements).
 - Snapshot output control: `--snapshot` gains `--metadata-only` and `--out FILE` for bounded output and exact-byte capture to a file (`--out` refuses paths inside the reviewed repository); the lifecycle now prefers the metadata-first flow before replacement, and an oversized or malformed prior report yields a `Partial`/`Blocked` run instead of streaming its content.
 - A consolidated `super-review` CLI package under `cli/` (`validate | snapshot | commit | fingerprint`) wrapping the skill-root helpers with an explicit trusted root, a dependency-free runtime, hostile-CWD isolation tests, and an offline console smoke.
-- The Apache-2.0 license text ships in every distributable payload (`super-review/LICENSE` in the ZIP, `src/LICENSE` for marketplace installs), with byte-equality regressions.
+- The Apache-2.0 license text ships in every distributable payload (`super-review/LICENSE` in the ZIP, `src/LICENSE` for marketplace installs, `cli/LICENSE` in the CLI package), with byte-equality regressions.
 - Decision D15: the MCP companion is replaced by the CLI — no server, no ambient tool surface, nothing invocable by host auto-run or prompt injection.
 
 ### Changed

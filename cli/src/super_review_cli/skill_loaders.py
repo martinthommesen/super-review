@@ -31,7 +31,10 @@ def _require_regular_file(path: Path, *, label: str) -> Path:
         raise SkillLoadError(f"refusing symbolic-link {label}: {path}")
     if not stat.S_ISREG(info.st_mode):
         raise SkillLoadError(f"{label} must be a regular file: {path}")
-    return path.resolve(strict=True)
+    try:
+        return path.resolve(strict=True)
+    except OSError as exc:
+        raise SkillLoadError(f"cannot resolve {label} {path}: {exc}") from exc
 
 
 def resolve_skill_root(skill_root: Path) -> Path:
@@ -58,7 +61,10 @@ def resolve_skill_root(skill_root: Path) -> Path:
         raise SkillLoadError(f"refusing symbolic-link skill root: {root}")
     if not stat.S_ISDIR(info.st_mode):
         raise SkillLoadError(f"skill root is not a directory: {root}")
-    resolved = root.resolve(strict=True)
+    try:
+        resolved = root.resolve(strict=True)
+    except OSError as exc:
+        raise SkillLoadError(f"cannot resolve skill root {root}: {exc}") from exc
     skill_md = resolved / "SKILL.md"
     _require_regular_file(skill_md, label="SKILL.md")
     scripts = resolved / "scripts"
@@ -89,7 +95,11 @@ def load_helper(skill_root: Path, filename: str, module_name: str) -> ModuleType
     root = resolve_skill_root(skill_root)
     leaf = root / "scripts" / filename
     sibling = _require_regular_file(leaf, label="helper")
-    if sibling.parent != (root / "scripts").resolve(strict=True):
+    try:
+        scripts_dir = (root / "scripts").resolve(strict=True)
+    except OSError as exc:
+        raise SkillLoadError(f"cannot resolve skill scripts directory: {exc}") from exc
+    if sibling.parent != scripts_dir:
         raise SkillLoadError(f"helper escapes skill scripts directory: {sibling}")
     spec = importlib.util.spec_from_file_location(module_name, sibling)
     if spec is None or spec.loader is None:

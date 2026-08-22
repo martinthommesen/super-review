@@ -3,6 +3,7 @@ name = "super-review-cli"
 version = "0.1.0"
 description = "Consolidated command-line front-end for the super-review FINDINGS helpers"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = []
 

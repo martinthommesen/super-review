@@ -118,6 +118,19 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("absolute", err)
 
+    def test_skill_root_resolution_oserror_maps_to_exit_2(self) -> None:
+        # A root whose strict resolution fails after the lstat checks (removed
+        # in between, unreadable parent, dead network mount) must surface as
+        # the documented usage exit code, never as a traceback.
+        with mock.patch.object(
+            Path, "resolve", side_effect=OSError("transport endpoint disconnected")
+        ):
+            code, _, err = run_cli(
+                "--skill-root", str(SKILL_ROOT), "validate", "irrelevant"
+            )
+        self.assertEqual(code, 2)
+        self.assertIn("cannot resolve skill root", err)
+
     def test_validate_round_trip(self) -> None:
         candidate = self.write_candidate()
         code, out, _ = with_root("validate", str(candidate))

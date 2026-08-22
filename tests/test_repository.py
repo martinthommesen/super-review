@@ -370,8 +370,64 @@ class RepositoryTests(unittest.TestCase):
         # so every distributable payload carries a byte-identical copy.
         root_license = (ROOT / "LICENSE").read_bytes()
         self.assertIn(b"Apache License", root_license)
-        for relative in ("src/LICENSE", "src/super-review/LICENSE"):
+        for relative in ("src/LICENSE", "src/super-review/LICENSE", "cli/LICENSE"):
             self.assertEqual((ROOT / relative).read_bytes(), root_license, relative)
+
+    def test_mode_normalization_matches_between_build_and_verify(self) -> None:
+        build = load_module("_workbench_build_modes", ROOT / "scripts" / "build.py")
+        verify = load_module(
+            "_workbench_verify_modes", ROOT / "scripts" / "verify_dist.py"
+        )
+        for source_mode, archive_mode in {
+            0o400: 0o644,
+            0o444: 0o644,
+            0o600: 0o644,
+            0o640: 0o644,
+            0o664: 0o644,
+            0o500: 0o755,
+            0o555: 0o755,
+            0o700: 0o755,
+            0o750: 0o755,
+            0o775: 0o755,
+        }.items():
+            self.assertEqual(
+                build._normalized_mode(source_mode), archive_mode, oct(source_mode)
+            )
+            self.assertEqual(
+                verify._normalized_mode(source_mode), archive_mode, oct(source_mode)
+            )
+
+    def test_build_normalizes_restrictive_source_modes(self) -> None:
+        build = load_module(
+            "_workbench_build_restrictive", ROOT / "scripts" / "build.py"
+        )
+        verify = load_module(
+            "_workbench_verify_restrictive", ROOT / "scripts" / "verify_dist.py"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source = base / "skill"
+            (source / "scripts").mkdir(parents=True)
+            plain = source / "SKILL.md"
+            plain.write_text("stub\n", encoding="utf-8")
+            plain.chmod(0o600)
+            executable = source / "scripts" / "validate_findings.py"
+            executable.write_text("print('stub')\n", encoding="utf-8")
+            executable.chmod(0o700)
+            artifact = base / "super-review-skill.zip"
+            with (
+                mock.patch.object(build, "SOURCE_ROOT", source),
+                mock.patch.object(verify, "SOURCE_ROOT", source),
+            ):
+                build.build(artifact)
+                verify.verify(artifact, run_tests=False)
+            with zipfile.ZipFile(artifact) as archive:
+                modes = {
+                    info.filename: (info.external_attr >> 16) & 0o777
+                    for info in archive.infolist()
+                }
+        self.assertEqual(modes["super-review/SKILL.md"], 0o644)
+        self.assertEqual(modes["super-review/scripts/validate_findings.py"], 0o755)
 
     def test_archive_license_bytes_match_root_license(self) -> None:
         build = load_module("_workbench_build_license", ROOT / "scripts" / "build.py")

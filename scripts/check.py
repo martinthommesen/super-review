@@ -46,6 +46,7 @@ def _check_tree() -> None:
         REPO_ROOT / ".claude-plugin" / "marketplace.json",
         REPO_ROOT / ".cursor-plugin" / "plugin.json",
         REPO_ROOT / ".github" / "plugin" / "marketplace.json",
+        REPO_ROOT / "cli" / "LICENSE",
         REPO_ROOT / "src" / ".claude-plugin" / "plugin.json",
         REPO_ROOT / "src" / ".codex-plugin" / "plugin.json",
         REPO_ROOT / "src" / "client-adapters" / "commands" / "super-review.md",

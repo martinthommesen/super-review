@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c 'import json,os,sys; d=json.load(sys.stdin); p=(d.get(\"tool_input\") or {}).get(\"file_path\") or \"\"; r=os.environ.get(\"CLAUDE_PROJECT_DIR\",\"\"); p=p[len(r)+1:] if r and p.startswith(r+\"/\") else p; sys.stdout.write(json.dumps({\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked by repo policy: dist/ is generated (edit src/super-review/ and run make build); docs/ORIGINAL_REVIEW_PROMPT.md is archival provenance.\"}})) if p.startswith(\"dist/\") or p.startswith(\"docs/ORIGINAL_REVIEW_PROMPT.md\") else None'",
+            "command": "python3 -c 'import json,os,sys; d=json.load(sys.stdin); p=(d.get(\"tool_input\") or {}).get(\"file_path\") or \"\"; r=os.path.realpath(os.environ.get(\"CLAUDE_PROJECT_DIR\") or os.getcwd()); q=os.path.relpath(os.path.realpath(p if os.path.isabs(p) else os.path.join(r,p)),r); sys.stdout.write(json.dumps({\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked by repo policy: dist/ is generated (edit src/super-review/ and run make build); docs/ORIGINAL_REVIEW_PROMPT.md is archival provenance.\"}})) if q.split(os.sep)[0]==\"dist\" or q==os.path.join(\"docs\",\"ORIGINAL_REVIEW_PROMPT.md\") else None'",
             "timeout": 10
           }
         ]

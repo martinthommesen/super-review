@@ -1,12 +1,12 @@
 # Release Process
 
-The release process is local and validation-gated. It never commits, pushes, publishes, or creates a remote release.
+Repository tooling is local and validation-gated: no script or make target commits, pushes, publishes, or creates a remote release. The only steps that touch a remote — publishing (step 8) and tag creation (step 9) — are explicit operator actions run by hand after every gate has passed.
 
 ## 1. Prepare the change
 
 - Update `src/super-review/` and all coupled tests/docs.
 - Update `VERSION`, `pyproject.toml`, the `Version:` line in `SKILL.md`, `CHANGELOG.md`, `README.md`, and every versioned marketplace or plugin manifest together for a release.
-- If the optional MCP companion's install/launch/wire contract changes, update `companion/` docs and its own version in `companion/pyproject.toml`; keep companion runtime pins out of the root workbench dev group.
+- If the consolidated CLI's install or command contract changes, update `cli/README.md` and its own version in `cli/pyproject.toml` (the CLI versions independently of the skill); keep CLI dev pins out of the root workbench dev group.
 - Regenerate `examples/FINDINGS.example.md` after schema or fixture changes.
 - Keep the original source prompt unchanged unless the archival source itself is intentionally being replaced; update its checksum in that exceptional case.
 
@@ -40,7 +40,7 @@ claude plugin validate src --strict
 
 Copilot and Codex marketplace smoke tests require their respective clients. Add this repository as a marketplace, install `super-review@super-review`, verify the skill source, and invoke the client-specific explicit command before publishing.
 
-For Cursor, confirm `.cursor-plugin/plugin.json` points at `./src/super-review`, the Cursor command adapter, and `src/client-adapters/cursor/mcp.json`. Prefer a user-level plugin install when smoke-testing the companion MCP.
+For Cursor, confirm `.cursor-plugin/plugin.json` points at `./src/super-review` and the Cursor command adapter, and registers no MCP server (decision D15). The consolidated CLI is validated separately by `make cli-test`.
 
 ## 5. Build the distributable
 
@@ -74,7 +74,7 @@ Publishing is intentionally outside repository automation. Push the verified mar
 
 ## 9. Tag the release
 
-After the release commit is on the default branch, create an immutable annotated tag so marketplace consumers can pin exact revisions (for example Codex `--ref`):
+This step is an explicit operator action, like step 8: nothing in `scripts/` or the Makefile creates or pushes tags. After the release commit is on the default branch, create an immutable annotated tag so marketplace consumers can pin exact revisions (for example Codex `--ref`):
 
 ```bash
 git tag -a vX.Y.Z -m "super-review X.Y.Z"

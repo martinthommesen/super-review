@@ -31,6 +31,12 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _normalized_mode(source_mode: int) -> int:
+    """Map a source mode to git's model (0644/0755 by executable bit); must
+    match the builder's normalization exactly."""
+    return 0o755 if source_mode & 0o111 else 0o644
+
+
 def _source_files() -> dict[str, Path]:
     result: dict[str, Path] = {}
     for path in sorted(SOURCE_ROOT.rglob("*"), key=lambda item: item.as_posix()):
@@ -122,10 +128,9 @@ def verify(artifact: Path, *, run_tests: bool = True) -> str:
                 )
             archive_mode = (seen[relative].external_attr >> 16) & 0o777
             source_mode = stat.S_IMODE(source.stat().st_mode)
-            # The builder normalizes modes to git's model (0644/0755 by
-            # executable bit); verify against that expectation, not the
+            # Verify against the builder's normalized expectation, not the
             # umask-dependent working-tree mode.
-            normalized_mode = 0o755 if source_mode & 0o111 else 0o644
+            normalized_mode = _normalized_mode(source_mode)
             if archive_mode != normalized_mode:
                 raise RuntimeError(
                     f"mode mismatch for {relative}: expected={oct(normalized_mode)}, archive={oct(archive_mode)}"
