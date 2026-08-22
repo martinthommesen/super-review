@@ -197,8 +197,6 @@ python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>
 
 Fix every reported error. Do not weaken the validator or edit the report around a legitimate inconsistency. When Python is unavailable, manually perform every validation implemented by the script and record that the mechanical validator could not run.
 
-When the optional MCP companion is in use under the D14 rules in `SKILL.md`, `validate_findings` with UTF-8 `content` + `content_sha256` is an allowed front-end for schema validation of candidates within the companion size bound. Its optional `canonical_root` argument checks only the report's *stated* Canonical root metadata (not on-disk path placement); the mandatory CLI post-write pass with `--canonical-root` still enforces path + stated-root identity. Default to the CLI; above the MCP size bound, use the CLI with an on-disk candidate. Snapshot content returned over MCP is likewise capped at the companion size bound — larger on-disk reports return digest/size only and require the CLI `--snapshot` path for exact bytes.
-
 ## Digest-gated replacement and concurrent edits
 
 Immediately before replacement:
@@ -214,8 +212,6 @@ If the digest changed, do not overwrite the file. The change may contain human d
 
 Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` when Python 3 is available. The path must resolve from the loaded skill package, never from the target repository. It validates the candidate, requires the candidate's stated `Canonical root` to be absolute and match the commit destination without dereferencing the report-controlled path, obtains an out-of-repository advisory lock, verifies the expected digest, verifies protected blocks, writes a same-directory temporary file, flushes it, rereads the target immediately before replacement, atomically replaces the target, flushes the directory where supported, and verifies the final digest. It refuses symbolic-link targets, digest conflicts, relative canonical roots, and any candidate whose stated canonical root belongs to a different repository. The path CLI is a thin front on `commit_bytes`, the single write core.
 
-An affirmed companion `commit_findings` (only on hosts with a write-authorization gate) may supply UTF-8 `content` + `content_sha256` to that same `commit_bytes` core. After any MCP commit that claims success, the post-write CLI validation below remains mandatory.
-
 The canonical-root check is the last line of defense against writing a report generated for one repository into another repository's `FINDINGS.md` — for example, when two concurrent reviews collide on a shared candidate path. Generate each candidate with the correct absolute `Canonical root` for its target, and keep candidates for different targets under distinct out-of-repository paths.
 
 An atomic rename prevents a partial file; it does not by itself prevent lost updates. The digest gate and advisory lock fully serialize cooperating writers that use this helper; a non-cooperating writer (an editor, another tool) racing the final instant of replacement can still win or lose that race — detection of such writers is best-effort, up to the last pre-replacement read and the post-write verification. Never bypass the digest check merely to satisfy the mandatory-write requirement. The run is incomplete until a safe write succeeds. If the file continues changing and cannot be reconciled, leave the current file intact, report the concurrent-edit conflict, and do not claim that `FINDINGS.md` was refreshed.
@@ -226,7 +222,7 @@ After replacement:
 
 1. Confirm the path is exactly `<canonical-root>/FINDINGS.md` and is a regular file.
 2. Recompute its digest and compare it with the validated candidate.
-3. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --canonical-root <canonical-root> <canonical-root>/FINDINGS.md` on the committed file. The `--canonical-root` flag confirms the committed file resolves to `<canonical-root>/FINDINGS.md` and that its stated `Canonical root` names that same repository, so a report cannot pass verification for a repository it does not live in. This CLI pass is mandatory even when the commit went through the optional MCP companion.
+3. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --canonical-root <canonical-root> <canonical-root>/FINDINGS.md` on the committed file. The `--canonical-root` flag confirms the committed file resolves to `<canonical-root>/FINDINGS.md` and that its stated `Canonical root` names that same repository, so a report cannot pass verification for a repository it does not live in.
 4. Reread the registry, metadata, executive summary, top findings, each canonical-record section, roadmap, validation section, positive patterns, protected blocks, and ending.
 5. Confirm all active IDs are current, all retired IDs remain reserved, summaries and roadmaps reference active records, and no prior resolved item is counted as active.
 6. Confirm the report states the exact revision or directory state, review time and timezone, review mode, prior-report revalidation status, completion status, and material limitations.

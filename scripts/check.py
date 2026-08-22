@@ -54,7 +54,6 @@ def _check_tree() -> None:
         / "cursor"
         / "commands"
         / "super-review.md",
-        REPO_ROOT / "src" / "client-adapters" / "cursor" / "mcp.json",
         REPO_ROOT / "src" / "plugin.json",
         REPO_ROOT / "src" / "LICENSE",
         SOURCE_ROOT / "LICENSE",

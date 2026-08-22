@@ -50,9 +50,9 @@ Build and verification tools are standard-library-only and write only to explici
 
 ## D13 — One canonical skill behind thin marketplace adapters
 
-Claude Code, GitHub Copilot CLI, Codex, and Cursor require different marketplace and plugin manifests. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`. The adapter originally set `disable-model-invocation: true`, but Claude Code routes even user-typed slash commands through the model's Skill tool, so the flag made the command impossible to invoke at all; the adapter now relies on the skill description and the `SKILL.md` invocation gate for explicit-only activation. Codex points directly to the canonical skill and uses `agents/openai.yaml`. Cursor uses a repo-root `.cursor-plugin/plugin.json` that points `skills` at `./src/super-review`, adds a thin Cursor command adapter, and registers the optional companion MCP via `${PLUGIN_ROOT}` paths. No adapter copies or symlinks the skill. Codex direct installs keep their unqualified invocation. Marketplace namespaces are accepted as explicit invocation without changing review behavior.
+Claude Code, GitHub Copilot CLI, Codex, and Cursor require different marketplace and plugin manifests. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`. The adapter originally set `disable-model-invocation: true`, but Claude Code routes even user-typed slash commands through the model's Skill tool, so the flag made the command impossible to invoke at all; the adapter now relies on the skill description and the `SKILL.md` invocation gate for explicit-only activation. Codex points directly to the canonical skill and uses `agents/openai.yaml`. Cursor uses a repo-root `.cursor-plugin/plugin.json` that points `skills` at `./src/super-review` and adds a thin Cursor command adapter (no MCP registration; see D15). No adapter copies or symlinks the skill. Codex direct installs keep their unqualified invocation. Marketplace namespaces are accepted as explicit invocation without changing review behavior.
 
-## D14 — Optional MCP companion requires enforceable host trust
+## D14 — Optional MCP companion requires enforceable host trust (superseded by D15)
 
 An optional companion MCP may front the FINDINGS helpers, but MCP configuration is a weaker trust anchor than `$SKILL_ROOT`. Hosts such as Claude Code resolve duplicate server names with local and project scope above user scope, so a reviewed repository's `.mcp.json` can override a user-scoped companion by name. Agents generally cannot observe that precedence from tool names alone, and a lookalike server can lie about any self-reported skill root or digest.
 
@@ -66,3 +66,17 @@ Therefore:
 6. Do not recommend project-scoped companion installation in reviewed repositories.
 
 The companion lives outside the portable skill ZIP under `companion/`, with its own dependency pins and CI job.
+
+## D15 — Replace the MCP companion with a consolidated CLI
+
+The D14 conditions proved structurally unenforceable in practice. An MCP server is an ambient tool surface: once registered, host auto-run machinery (or a prompt-injected agent) can invoke its tools without a per-call human decision, host provenance attestation is rarely available, and a user-scoped server serves every workspace with one launch-time configuration, so a snapshot tool could read another repository's `FINDINGS.md` by absolute path. Rather than gating that surface, remove it.
+
+The companion is replaced by `cli/`, a consolidated `super-review` console command (`validate | snapshot | commit | fingerprint`) that forwards to the same skill-root helpers:
+
+1. No server, no ambient surface: nothing runs unless explicitly invoked with explicit arguments, so there is nothing for auto-run modes or prompt injection to call.
+2. The trusted skill root stays explicit (`--skill-root` or `SUPER_REVIEW_SKILL_ROOT`) and is resolved with the same symlink/escape checks (D6); it is never inferred from the working directory.
+3. `snapshot` accepts only a repository root and derives `<repo-root>/FINDINGS.md`, so the command cannot be pointed at arbitrary files.
+4. Commit semantics are unchanged: the CLI forwards to `commit_findings.py`, keeping the digest gate, annotation preservation, and exit codes.
+5. The CLI runtime is dependency-free; the MCP SDK leaves the repository entirely.
+
+The shipped skill drops all MCP prose and keeps its portable `python3 -I "$SKILL_ROOT/scripts/…"` contract; the CLI is a workbench-distributed convenience outside the ZIP, under `cli/` with its own pins, lockfile, and CI job.

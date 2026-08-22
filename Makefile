@@ -3,7 +3,7 @@ PYTHON_ENV ?= PYTHONDONTWRITEBYTECODE=1
 UV ?= uv
 ARTIFACT ?= dist/super-review-skill.zip
 
-.PHONY: help check test lint fmt coverage coverage-run coverage-clean-pycache spec build verify release clean example companion-test
+.PHONY: help check test lint fmt coverage coverage-run coverage-clean-pycache spec build verify release clean example cli-test
 
 help:
 	@printf '%s\n' \
@@ -17,7 +17,7 @@ help:
 	  'make verify   Verify the distributable and run tests from extraction' \
 	  'make release  Clean, check, spec-validate, build, and verify' \
 	  'make example  Regenerate the valid example FINDINGS.md fixture' \
-	  'make companion-test  Sync and test the optional MCP companion' \
+	  'make cli-test Sync and test the consolidated CLI package' \
 	  'make clean    Remove generated local artifacts'
 
 check:
@@ -75,8 +75,8 @@ release: clean check spec build verify
 example:
 	$(PYTHON_ENV) $(PYTHON) scripts/generate_example.py
 
-companion-test:
-	cd companion && \
+cli-test:
+	cd cli && \
 	if command -v $(UV) >/dev/null 2>&1; then \
 	  $(UV) sync --frozen && \
 	  $(UV) run ruff check . && \

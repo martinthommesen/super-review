@@ -10,7 +10,7 @@ paths, and the 14 non-negotiable skill invariants.
 - Inspect affected instructions, helpers, tests, fixtures, examples, schemas, and release tooling before editing.
 - Reuse current patterns. Do not introduce speculative abstractions or dependencies.
 - Keep shipped runtime helpers dependency-free unless a concrete requirement justifies a reviewed change.
-- The optional MCP companion under `companion/` may depend on the MCP SDK; keep those pins out of root `[dependency-groups].dev` / `requirements-dev.txt`.
+- The consolidated CLI under `cli/` keeps its own dev pins and lockfile; keep those pins out of root `[dependency-groups].dev` / `requirements-dev.txt`. Its runtime stays dependency-free.
 - Preserve public behavior, report compatibility, protected annotations, and stable IDs unless a migration is explicitly designed.
 - Avoid formatting churn and unrelated cleanup.
 - Never weaken a test merely to make it pass.
@@ -40,13 +40,13 @@ python3 scripts/check.py
 make lint
 ```
 
-When `companion/` changed, also run:
+When `cli/` changed, also run:
 
 ```bash
-make companion-test
+make cli-test
 ```
 
-Root `python3 scripts/check.py` and `make lint` intentionally exclude `companion/`; do not treat them as a full-repository green signal when companion files change.
+Root `python3 scripts/check.py` and `make lint` intentionally exclude `cli/`; do not treat them as a full-repository green signal when CLI files change.
 
 When `skills-ref` is installed, also run:
 

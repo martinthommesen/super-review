@@ -15,7 +15,7 @@ Maintain `super-review` as a strict, evidence-driven, explicit-invocation Agent 
 - `src/super-review/tests/` tests the shipped package and runtime helpers.
 - Root `scripts/` contains repository-only build, check, and release tooling.
 - Root `tests/` tests repository packaging and maintenance invariants.
-- `companion/` is an optional MCP front-end with its own pins/lock/CI; it is not part of the portable skill ZIP.
+- `cli/` is a consolidated command-line front-end over the shipped helpers with its own pins/lock/CI; it is not part of the portable skill ZIP.
 - `dist/` is generated. Never edit it manually.
 - `docs/ORIGINAL_REVIEW_PROMPT.md` is archival source material. Do not rewrite it as part of ordinary refactoring.
 
@@ -40,7 +40,7 @@ Do not weaken or remove these without an explicit design decision and matching r
 
 ## Required operations
 
-- Before completion run `python3 scripts/check.py` and `make lint`. When `companion/` changed, also run `make companion-test` (root check/lint intentionally exclude companion).
+- Before completion run `python3 scripts/check.py` and `make lint`. When `cli/` changed, also run `make cli-test` (root check/lint intentionally exclude the CLI package).
 - Never weaken a test merely to make it pass. Do not commit, push, publish, deploy, delete data, or modify external systems from repository tooling.
 - Keep every enforced version location synchronized for user-visible changes: `VERSION`, `pyproject.toml`, the `SKILL.md` `Version:` line, `CHANGELOG.md`, the README version sentence, and all versioned plugin/marketplace manifests (full list: `docs/RELEASE.md` step 1). Dual-pin root dev tools in `pyproject.toml` and `requirements-dev.txt`.
 

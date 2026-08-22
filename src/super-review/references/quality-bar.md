@@ -88,7 +88,7 @@ Before writing the repository file:
    python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>
    ```
 
-3. Fix every error. Do not weaken the script or remove legitimate records merely to make it pass. When D14 companion use is affirmed and content is within the MCP size bound, companion `validate_findings` (UTF-8 `content` + `content_sha256`) is an allowed front-end; default to the CLI and fall back to the CLI above the MCP size bound.
+3. Fix every error. Do not weaken the script or remove legitimate records merely to make it pass.
 4. Confirm all active fingerprints with `python3 -I "$SKILL_ROOT/scripts/finding_fingerprint.py" ...` or equivalent deterministic computation.
 5. Confirm the candidate contains every protected human block from the latest current report exactly.
 6. Confirm each Critical and High defect or risk appears in `# 5. Top Findings` and `# 14. Prioritized Roadmap`.
@@ -106,14 +106,14 @@ python3 -I "$SKILL_ROOT/scripts/commit_findings.py" \
   --expected-sha256 <digest-or-MISSING>
 ```
 
-A digest conflict is not a reason to force the write. Reopen and revalidate the latest file, regenerate, and retry. The run remains incomplete until the canonical report is safely refreshed or the unresolved conflict is reported without data loss. An affirmed companion `commit_findings` (host write-gate only) may call the same `commit_bytes` core with UTF-8 `content` + `content_sha256`; otherwise keep commit on the CLI.
+A digest conflict is not a reason to force the write. Reopen and revalidate the latest file, regenerate, and retry. The run remains incomplete until the canonical report is safely refreshed or the unresolved conflict is reported without data loss.
 
 ## Post-write gate
 
 After the safe write:
 
 1. Confirm the target is the root `FINDINGS.md`, not a symlink or nested copy.
-2. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --canonical-root <canonical-root> <canonical-root>/FINDINGS.md` against the committed file. The `--canonical-root` flag confirms the committed file resolves to `<canonical-root>/FINDINGS.md` and that its stated `Canonical root` names that same repository. This CLI pass is mandatory even when the commit went through the optional MCP companion.
+2. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --canonical-root <canonical-root> <canonical-root>/FINDINGS.md` against the committed file. The `--canonical-root` flag confirms the committed file resolves to `<canonical-root>/FINDINGS.md` and that its stated `Canonical root` names that same repository.
 3. Compare the committed digest with the candidate digest.
 4. Reread the beginning, registry, report metadata, top table, every canonical-record section, roadmap, validation section, positive patterns, protected human blocks, and ending.
 5. Reopen every Critical and High finding's primary evidence and a representative sample of other records.

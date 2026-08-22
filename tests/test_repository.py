@@ -4,9 +4,7 @@ import hashlib
 import importlib.util
 import json
 import re
-import shutil
 import stat
-import subprocess
 import sys
 import tempfile
 import tomllib
@@ -170,7 +168,7 @@ class RepositoryTests(unittest.TestCase):
             ],
         )
 
-    def test_cursor_plugin_targets_canonical_skill_and_companion(self) -> None:
+    def test_cursor_plugin_targets_canonical_skill_only(self) -> None:
         manifest = json.loads(
             (ROOT / ".cursor-plugin" / "plugin.json").read_text(encoding="utf-8")
         )
@@ -199,46 +197,14 @@ class RepositoryTests(unittest.TestCase):
         ).resolve(strict=True)
         self.assertEqual(canonical_link, (SKILL / "SKILL.md").resolve(strict=True))
 
-        mcp_relative = manifest["mcpServers"]
-        self.assertEqual(mcp_relative, "./src/client-adapters/cursor/mcp.json")
-        mcp = json.loads((ROOT / mcp_relative).read_text(encoding="utf-8"))
-        server = mcp["mcpServers"]["super-review"]
-        self.assertEqual(server["command"], "uv")
-        args = server["args"]
-        self.assertEqual(args[0], "run")
-        self.assertNotIn("-m", args)
-        self.assertNotIn("python3", [server["command"], *args])
-        self.assertIn("${PLUGIN_ROOT}/companion", args)
-        self.assertIn("${PLUGIN_ROOT}/src/super-review", args)
-        self.assertNotIn("--enable-commit", args)
-        self.assertIn("--frozen", args)
-
-    def test_cursor_mcp_launch_command_smoke(self) -> None:
-        """Exercise the exact bundled MCP argv against the installed uv executable."""
-        if shutil.which("uv") is None:
-            self.skipTest("uv executable not on PATH")
-        mcp = json.loads(
-            (ROOT / "src" / "client-adapters" / "cursor" / "mcp.json").read_text(
-                encoding="utf-8"
-            )
+        # The plugin registers no MCP server (decision D15): the consolidated
+        # CLI replaced the companion, so there is no ambient tool surface for
+        # Auto-run to invoke. Its executable smoke lives in cli/tests/.
+        self.assertNotIn("mcpServers", manifest)
+        self.assertFalse(
+            (ROOT / "src" / "client-adapters" / "cursor" / "mcp.json").exists()
         )
-        server = mcp["mcpServers"]["super-review"]
-        args = [arg.replace("${PLUGIN_ROOT}", str(ROOT)) for arg in server["args"]]
-        completed = subprocess.run(
-            [server["command"], *args, "--help"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        self.assertEqual(
-            completed.returncode,
-            0,
-            msg=f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
-        )
-        combined = f"{completed.stdout}\n{completed.stderr}"
-        self.assertIn("--skill-root", combined)
-        self.assertIn("--enable-commit", combined)
+        self.assertFalse((ROOT / "companion").exists())
 
     def test_original_prompt_provenance(self) -> None:
         prompt = ROOT / "docs" / "ORIGINAL_REVIEW_PROMPT.md"
@@ -286,15 +252,15 @@ class RepositoryTests(unittest.TestCase):
 
     def test_agent_host_integration_files_have_expected_shape(self) -> None:
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("make companion-test", agents)
+        self.assertIn("make cli-test", agents)
         self.assertIn("python3 scripts/check.py", agents)
         self.assertIn("Do not commit, push, publish, deploy", agents)
 
         pre_commit = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
         self.assertIn("id: ruff-check", pre_commit)
-        self.assertIn("id: companion-check", pre_commit)
+        self.assertIn("id: cli-check", pre_commit)
         self.assertRegex(pre_commit, r"(?m)^\s*entry:\s*ty check\s*$")
-        self.assertIn("files: ^companion/", pre_commit)
+        self.assertIn("files: ^cli/", pre_commit)
 
         for relative in (
             ".claude/commands/check.md",
@@ -303,13 +269,13 @@ class RepositoryTests(unittest.TestCase):
             ".cursor/skills/workbench-validate/SKILL.md",
         ):
             text = (ROOT / relative).read_text(encoding="utf-8")
-            self.assertIn("companion-test", text, relative)
+            self.assertIn("cli-test", text, relative)
 
         rule = (ROOT / ".cursor" / "rules" / "workbench.mdc").read_text(
             encoding="utf-8"
         )
         self.assertIn("alwaysApply: true", rule)
-        self.assertIn("companion-test", rule)
+        self.assertIn("cli-test", rule)
 
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("$(UV) run coverage", makefile)

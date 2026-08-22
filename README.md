@@ -59,13 +59,13 @@ Invoke the installed plugin explicitly as `$super-review:super-review`.
 
 #### Cursor
 
-This repository is a Cursor plugin (`.cursor-plugin/plugin.json`). It installs the canonical skill plus the optional FINDINGS companion MCP.
+This repository is a Cursor plugin (`.cursor-plugin/plugin.json`). It installs the canonical skill and a thin command adapter — nothing else. The plugin registers no MCP server (decision D15): programmatic access to the FINDINGS helpers goes through the consolidated [`super-review` CLI](cli/README.md), which runs only when explicitly invoked with explicit arguments, so Cursor Auto-run has no ambient tool surface to call.
 
-Prefer a **user-level** plugin install so the companion is not registered only through a reviewed repository's project config (decision D14). Install from the Cursor marketplace once published, or add this repository as a local/team marketplace plugin and install `super-review` at user scope.
+Install from the Cursor marketplace once published, or add this repository as a local/team marketplace plugin and install `super-review`.
 
-Requirements on the machine: `python3` and the [`uv`](https://docs.astral.sh/uv/) executable on `PATH` (the plugin MCP entry runs `uv run --directory …/companion`).
+Requirements on the machine: `python3` for the bundled helpers.
 
-Invoke the skill explicitly (for example via the plugin command or by naming `$super-review` / `@super-review` / `/super-review` per the skill gate). The bundled Cursor companion is **read-only** (no `commit_findings`): Cursor Auto-run / Auto-review can invoke allowlisted or classifier-approved MCP tools without a prompt, so per-call MCP approval is not a D14 write gate. Keep commits on the skill-root CLI unless you add a separate host gate that Auto-run cannot bypass.
+Invoke the skill explicitly (for example via the plugin command or by naming `$super-review` / `@super-review` / `/super-review` per the skill gate).
 
 ### Direct skill installation
 
@@ -122,11 +122,9 @@ python3 -I "$SKILL_ROOT/scripts/validate_findings.py" /tmp/FINDINGS.candidate.md
 python3 -I "$SKILL_ROOT/scripts/commit_findings.py" --help
 ```
 
-### Optional MCP companion
+### Consolidated CLI
 
-`companion/` is an optional typed MCP front-end over those helpers. It is **not** in the portable skill ZIP. Default to the skill-root CLI; use the companion only with host-attested active-server provenance and user affirmation (decision D14), and always post-validate commits via the CLI. See [`companion/README.md`](companion/README.md).
-
-Cursor users can install this repository as a Cursor plugin (user-level) to get the skill and companion together; see [Cursor](#cursor) above.
+`cli/` packages a `super-review` console command (`validate | snapshot | commit | fingerprint`) that wraps the same skill-root helpers. It replaced the earlier MCP companion (decision D15): a CLI has no server and no ambient tool surface, so nothing can invoke it except an explicit shell command with an explicit trusted skill root. It is **not** in the portable skill ZIP. See [`cli/README.md`](cli/README.md).
 
 ## This repository
 

@@ -15,9 +15,9 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
-      - id: companion-check
-        name: companion lint and test
-        entry: make companion-test
+      - id: cli-check
+        name: cli lint and test
+        entry: make cli-test
         language: system
         pass_filenames: false
-        files: ^companion/
+        files: ^cli/

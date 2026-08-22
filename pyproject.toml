@@ -21,7 +21,7 @@ package = false
 
 [tool.ruff]
 target-version = "py311"
-extend-exclude = ["dist", "companion"]
+extend-exclude = ["cli", "dist"]
 
 [tool.ruff.lint]
 extend-select = ["I"]
@@ -33,7 +33,7 @@ python-version = "3.11"
 extra-paths = ["src/super-review/scripts", "src/super-review/tests"]
 
 [tool.ty.src]
-exclude = ["companion/**", "dist/**"]
+exclude = ["cli/**", "dist/**"]
 
 [tool.coverage.run]
 branch = true
