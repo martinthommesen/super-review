@@ -7,6 +7,8 @@ import sys
 import unittest
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
 ROOT = Path(__file__).resolve(strict=True).parents[1]
 TESTS = ROOT / "tests"
 SCRIPTS = ROOT / "scripts"
