@@ -23,9 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(TESTS))
 sys.path.insert(0, str(SCRIPTS))
 
-import report_factory as rf  # noqa: E402
-from super_review_cli.__main__ import SKILL_ROOT_ENV, main  # noqa: E402
-from super_review_cli.skill_loaders import SkillLoadError, load_helper  # noqa: E402
+import report_factory as rf
+from super_review_cli.__main__ import SKILL_ROOT_ENV, main
+from super_review_cli.skill_loaders import SkillLoadError, load_helper
 
 
 def run_cli(*argv: str) -> tuple[int, str, str]:
