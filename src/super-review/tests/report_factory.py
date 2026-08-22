@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 
@@ -61,7 +62,7 @@ def make_defect(
         ),
         (
             "Evidence",
-            "- `src/request.py:10-24` — validation omits the state invariant.",
+            "- `src/request.py:10-24`: validation omits the state invariant.",
         ),
         (
             "Current behavior",
@@ -92,7 +93,7 @@ def make_defect(
         ),
         (
             "Alternative approaches",
-            "1. Boundary and domain validation.\n2. Domain-only validation with typed construction.\n3. Not applicable — keeping the gap is unsafe.",
+            "1. Boundary and domain validation.\n2. Domain-only validation with typed construction.\n3. Not applicable: keeping the gap is unsafe.",
         ),
         (
             "Preferred option",
@@ -110,15 +111,15 @@ def make_defect(
             "Validation",
             "Unit and integration regression tests for invalid and valid states.",
         ),
-        ("Effort", "Small — one boundary and focused tests."),
+        ("Effort", "Small: one boundary and focused tests."),
         (
             "Risk of the proposed change",
-            "Low — behavior changes only for invalid input.",
+            "Low: behavior changes only for invalid input.",
         ),
         ("Dependencies", "None."),
         (
             "Open questions",
-            "Not applicable — intended invariant is established by schema and tests.",
+            "Not applicable: intended invariant is established by schema and tests.",
         ),
     ]
     body = f"## [{record_id}] Boundary validation permits an invalid state\n\n{_render_fields(fields)}"
@@ -151,7 +152,7 @@ def make_improvement(
         ("Affected components", "Pipeline stages and their callers."),
         (
             "Evidence",
-            "- `src/pipeline.py:20-80` — normalization is repeated across stages.",
+            "- `src/pipeline.py:20-80`: normalization is repeated across stages.",
         ),
         ("Current approach", "Each stage normalizes the same input independently."),
         (
@@ -246,16 +247,16 @@ Rewrite judgment: Incremental migration is sufficient.
         ),
         (
             "Compatibility and migration",
-            "Not applicable — no change is recommended now.",
+            "Not applicable: no change is recommended now.",
         ),
         ("Validation", "Reassess when another stage duplicates normalization."),
-        ("Effort", "Small — investigation only."),
+        ("Effort", "Small: investigation only."),
         (
             "Risk of the proposed change",
-            "Low — the current recommendation is to defer.",
+            "Low: the current recommendation is to defer.",
         ),
         ("Dependencies", "Evidence of another consumer or material drift."),
-        ("Open questions", "Not applicable — the decision threshold is explicit."),
+        ("Open questions", "Not applicable: the decision threshold is explicit."),
     ]
     body = (
         f"## [{record_id}] Consolidate pipeline normalization only when the trigger is met\n\n"
@@ -301,7 +302,7 @@ def make_feature(
             "Repository evidence",
             "Routes, persistence, authorization tests, and operator documentation.",
         ),
-        ("Current workaround", "Not applicable — the capability already exists."),
+        ("Current workaround", "Not applicable: the capability already exists."),
         ("Consequence of doing nothing", "The current traceability remains available."),
         (
             "Proposed behavior",
@@ -318,12 +319,12 @@ def make_feature(
             "Authorized operators search and inspect immutable entries.",
         ),
         ("Required permissions", "Existing least-privilege operator permission."),
-        ("Data-model changes", "Not applicable — preserve the existing schema."),
-        ("API changes", "Not applicable — preserve the existing contract."),
-        ("UI changes", "Not applicable — preserve the existing interface."),
+        ("Data-model changes", "Not applicable: preserve the existing schema."),
+        ("API changes", "Not applicable: preserve the existing contract."),
+        ("UI changes", "Not applicable: preserve the existing interface."),
         (
             "Background-processing changes",
-            "Not applicable — no background processing is involved.",
+            "Not applicable: no background processing is involved.",
         ),
         (
             "Security implications",
@@ -342,11 +343,11 @@ def make_feature(
             "Usage evidence missing",
             "Production frequency is unavailable and not required for preservation.",
         ),
-        ("Maintenance burden", "Bounded to one service and one UI surface."),
+        ("Maintenance burden", "Bounded to one service and one interface."),
         ("Overlap with other features", "No material overlap established."),
         (
             "Alternatives considered",
-            "1. Keep current design.\n2. Replace storage — unsupported.\n3. Remove — unsafe and unsupported.",
+            "1. Keep current design.\n2. Replace storage: unsupported.\n3. Remove: unsafe and unsupported.",
         ),
         ("Dependencies", "Existing authorization and retention controls."),
         (
@@ -357,17 +358,17 @@ def make_feature(
             "Test strategy",
             "Integration tests for permission, ordering, redaction, and retention.",
         ),
-        ("Migration strategy", "Not applicable — no migration."),
-        ("Rollout or deprecation plan", "Not applicable — preserve current behavior."),
-        ("Rollback strategy", "Not applicable — no behavioral change."),
+        ("Migration strategy", "Not applicable: no migration."),
+        ("Rollout or deprecation plan", "Not applicable: preserve current behavior."),
+        ("Rollback strategy", "Not applicable: no behavioral change."),
         ("Data-retention implications", "Preserve the established retention policy."),
         ("Success indicators", "Existing workflows and controls continue to pass."),
         (
             "Reconsideration or removal criteria",
             "Reconsider only with replacement traceability and consumer evidence.",
         ),
-        ("Final deletion criteria", "Not applicable — keep decision."),
-        ("Effort", "Small — regression coverage only."),
+        ("Final deletion criteria", "Not applicable: keep decision."),
+        ("Effort", "Small: regression coverage only."),
         ("Risks", "Accidental weakening during unrelated refactors."),
         (
             "Preservation rationale",
@@ -439,21 +440,41 @@ def make_positive(*, record_id: str = "POS-001") -> CanonicalRecord:
     return CanonicalRecord(record_id, record_type, fingerprint, 18, body)
 
 
+def make_retired_entry(
+    *,
+    status: str = "resolved",
+    replacement_ids: tuple[str, ...] = (),
+    seed: str = "retired-fixture",
+) -> dict:
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    return {
+        "fingerprint": f"sha256:{digest}",
+        "status": status,
+        "replacement_ids": list(replacement_ids),
+    }
+
+
 def build_report(
     records: list[CanonicalRecord] | None = None,
     *,
     canonical_root: str = DEFAULT_CANONICAL_ROOT,
+    retired: dict[str, dict] | None = None,
+    starting_digest: str = "MISSING",
+    revalidated: str = "No — file did not exist",
+    completion: str = "Complete",
+    material_limitations: str = "None",
 ) -> str:
     records = records or []
+    retired = retired or {}
     active = {record.record_id: record.fingerprint for record in records}
     next_sequence: dict[str, int] = {}
-    for record in records:
-        prefix, number = record.record_id.split("-", 1)
+    for record_id in [*active, *retired]:
+        prefix, number = record_id.split("-", 1)
         next_sequence[prefix] = max(next_sequence.get(prefix, 1), int(number) + 1)
     registry = {
         "schema_version": 2,
         "active": active,
-        "retired": {},
+        "retired": retired,
         "next_sequence": next_sequence,
     }
 
@@ -466,10 +487,10 @@ def build_report(
                 "Ending repository state: abc123 clean",
                 "Review time: 2026-07-22T12:00:00+02:00",
                 "Review mode: REVIEW ONLY",
-                "Starting FINDINGS.md SHA-256: MISSING",
-                "Existing report revalidated: No — file did not exist",
-                "Completion status: Complete",
-                "Material limitations: None",
+                f"Starting FINDINGS.md SHA-256: {starting_digest}",
+                f"Existing report revalidated: {revalidated}",
+                f"Completion status: {completion}",
+                f"Material limitations: {material_limitations}",
             ]
         )
     }
@@ -477,11 +498,10 @@ def build_report(
     top = [record for record in records if record.top_finding]
     section_bodies[5] = (
         "\n".join(
-            f"- {record.record_id} — {record.body.splitlines()[0][3:]}"
-            for record in top
+            f"- {record.record_id}: {record.body.splitlines()[0][3:]}" for record in top
         )
         if top
-        else "No current canonical records supported — no Critical or High records in fixture."
+        else "No current canonical records supported: no Critical or High records in fixture."
     )
 
     for section in (6, 7, 18):
@@ -489,7 +509,7 @@ def build_report(
         section_bodies[section] = (
             "\n\n".join(selected)
             if selected
-            else "No current canonical records supported — test fixture."
+            else "No current canonical records supported: test fixture."
         )
 
     feature_chunks: list[str] = []
@@ -502,7 +522,7 @@ def build_report(
         body = (
             "\n\n".join(selected)
             if selected
-            else "No current canonical records supported — test fixture."
+            else "No current canonical records supported: test fixture."
         )
         feature_chunks.append(f"## {subsection}\n\n{body}")
     section_bodies[8] = "\n\n".join(feature_chunks)
@@ -512,10 +532,10 @@ def build_report(
         selected = [record for record in records if record.roadmap == subsection]
         body = (
             "\n".join(
-                f"- {record.record_id} — fixture roadmap item." for record in selected
+                f"- {record.record_id}: fixture roadmap item." for record in selected
             )
             if selected
-            else "No current canonical records supported — test fixture."
+            else "No current canonical records supported: test fixture."
         )
         roadmap_chunks.append(f"## {subsection}\n\n{body}")
     section_bodies[14] = "\n\n".join(roadmap_chunks)
@@ -532,30 +552,12 @@ def build_report(
                 f"# {number}. {title}",
                 "",
                 section_bodies.get(
-                    number, "No current canonical records supported — test fixture."
+                    number, "No current canonical records supported: test fixture."
                 ),
                 "",
             ]
         )
     return "\n".join(chunks).rstrip() + "\n"
-
-
-# Focused compatibility helpers used by the regression modules. They delegate to
-# the canonical builders above so every fixture exercises the same report schema.
-def minimal_report() -> str:
-    return build_report()
-
-
-def defect_report(
-    *,
-    classification: str = "Confirmed defect",
-    impact: str = "Material bounded impact.",
-) -> str:
-    return build_report([make_defect(classification=classification, impact=impact)])
-
-
-def feature_do_not_pursue_report() -> str:
-    return build_report([make_improvement(priority="Do not pursue")])
 
 
 def add_global_human_block(report: str, body: str = "Manual decision.\n") -> str:

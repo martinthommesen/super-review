@@ -1,4 +1,2 @@
-# False positives: validate_findings.py parses "<token>" placeholders in
-# FINDINGS.md templates; no secrets involved.
-src/super-review/scripts/validate_findings.py:shell-export-secret:486
-src/super-review/scripts/validate_findings.py:shell-export-secret:1081
+# Add only commit-scoped false-positive fingerprints:
+# <commit-sha>:<path>:<rule-id>:<line>

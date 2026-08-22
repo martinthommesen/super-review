@@ -1,4 +1,6 @@
-# Development-only tooling used by `make spec`, `make lint`, `make coverage`, and CI.
+# Development-only tooling for the CI pip path and non-uv setups (the lint and
+# spec CI jobs install from this file). Local uv setups get the same tools from
+# [dependency-groups].dev in pyproject.toml via `uv sync --dev`.
 # Runtime scripts in the skill remain Python-standard-library-only.
 # Pins must match [dependency-groups].dev in pyproject.toml.
 coverage==7.15.2

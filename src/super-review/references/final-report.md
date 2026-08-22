@@ -1,10 +1,12 @@
-# Final `FINDINGS.md` Schema
+# Final `FINDINGS.md` schema
 
 Produce one coherent current-state report. Place the machine-readable `SUPER-REVIEW-REGISTRY` first, followed by any preserved global human-annotation blocks, then the sections below in this exact high-level order.
 
 A canonical record appears in full only in its designated section. Other sections reference its ID and provide only concise section-specific synthesis. Do not duplicate evidence, impact, alternatives, or implementation plans across summaries.
 
-If a section has no evidence-supported content, keep the required heading and state `No current canonical records supported — <coverage and evidence basis>`. Do not add filler.
+If a section has no evidence-supported content, keep the required heading and
+state `No current canonical records supported: <coverage and evidence basis>`.
+Do not add filler.
 
 # 1. Executive Summary
 
@@ -12,16 +14,18 @@ Begin with these exact metadata labels and current values:
 
 ```text
 Canonical root: <absolute canonical root, including any workspace-resolved root>
-Reviewed branch and revision: <branch and revision, or Not available — reason>
+Reviewed branch and revision: <branch and revision, or Not available: reason>
 Starting repository state: <revision and worktree/directory fingerprint>
 Ending repository state: <revision and worktree/directory fingerprint>
 Review time: <ISO 8601 timestamp with timezone>
 Review mode: <mode>
-Starting FINDINGS.md SHA-256: <sha256 digest or MISSING>
+Starting FINDINGS.md SHA-256: <MISSING, or sha256: followed by 64 lowercase hexadecimal characters>
 Existing report revalidated: <Yes | No — file did not exist | Partial — limitation>
 Completion status: <Complete | Partial | Blocked>
 Material limitations: <specific limitations or None>
 ```
+
+These values are cross-checked: `MISSING` pairs exactly with `Existing report revalidated: No — file did not exist` (in both directions); `Completion status: Complete` requires `Existing report revalidated` to be `Yes` or `No — file did not exist`; and `Material limitations: None` is rejected when the completion status is `Partial` or `Blocked`.
 
 Then include:
 
@@ -178,7 +182,7 @@ Synthesize, by canonical ID:
 - Missing performance, accessibility, or operational tests when applicable.
 - Recommended test additions by priority and smallest adequate test level.
 
-Do not create generic “add more tests” entries. Point to exact behavior and canonical records.
+Do not create generic "add more tests" entries. Point to exact behavior and canonical records.
 
 # 10. Security and Privacy Summary
 

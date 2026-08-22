@@ -1,4 +1,4 @@
-# PHASE 21 — VALIDATION AND REPRODUCTION
+# Phase 21: validation and reproduction
 
 Every executable check in this phase is subject to `references/command-safety.md`. Test, build, lint, package, scanner, Make, migration, and lifecycle commands are repository code and must not be treated as read-only by name alone.
 
@@ -55,5 +55,3 @@ Record:
 - Environmental limitations.
 - Checks not run and why.
 - Whether generated or modified files appeared.
-
-===============================================================================

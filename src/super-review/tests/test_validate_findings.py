@@ -90,7 +90,7 @@ Classification: Arbitrary
 ```
 """
         report = report.replace(
-            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
             "# 2. Repository and System Overview\n\n" + fenced,
             1,
         )
@@ -127,12 +127,59 @@ Classification: Arbitrary
 ```
 """
         report = report.replace(
-            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
             "# 2. Repository and System Overview\n\n" + snippet,
             1,
         )
         result = vf.validate_text(report)
         self.assertTrue(result.ok, result.errors)
+
+    def test_backtick_info_fence_line_is_prose(self) -> None:
+        report = rf.build_report().replace(
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
+            "# 2. Repository and System Overview\n\n```python`x\nprose after the non-fence line.",
+            1,
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_fence_marker_inside_annotation_is_protected_content(self) -> None:
+        report = rf.add_global_human_block(
+            rf.build_report(), "Decision.\n```\nrationale\n"
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+        blocks = vf.extract_human_blocks(report)
+        self.assertIn("global-decisions", blocks)
+        self.assertIn("```", blocks["global-decisions"])
+
+    def test_exotic_line_separators_do_not_split_lines(self) -> None:
+        report = rf.build_report().replace(
+            "# 2. Repository and System Overview\n\nNo current canonical records supported: test fixture.",
+            "# 2. Repository and System Overview\n\nprose\x0b```",
+            1,
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_close_fence_allows_only_space_and_tab(self) -> None:
+        base = (
+            "# 2. Repository and System Overview\n\n"
+            "No current canonical records supported: test fixture."
+        )
+        good = rf.build_report().replace(
+            base,
+            "# 2. Repository and System Overview\n\n```text\nexample\n``` \t",
+            1,
+        )
+        result = vf.validate_text(good)
+        self.assertTrue(result.ok, result.errors)
+        bad = rf.build_report().replace(
+            base,
+            "# 2. Repository and System Overview\n\n```text\nexample\n```\u00a0",
+            1,
+        )
+        self.assert_invalid_with(bad, "fenced code block is not closed")
 
     def test_unclosed_fence_is_rejected(self) -> None:
         report = rf.build_report().replace(
@@ -353,9 +400,6 @@ Classification: Arbitrary
             self.assertTrue(vf.validate_path(report, canonical_root=root).ok)
 
     def test_validate_path_requires_report_to_live_at_canonical_root(self) -> None:
-        # A report physically in repo B whose metadata (and the --canonical-root
-        # argument) both name repo A must not pass: metadata agreement is not
-        # proof the file lives in that repository.
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
             repo_a = base / "repo-a"
@@ -433,6 +477,608 @@ Classification: Arbitrary
                 self.skipTest(f"symlinks unavailable: {exc}")
             with self.assertRaises(vf.SnapshotError):
                 vf.snapshot(link)
+
+    def test_snapshot_reports_path_expansion_failure(self) -> None:
+        with mock.patch.object(
+            Path, "expanduser", side_effect=RuntimeError("unknown home")
+        ):
+            with self.assertRaisesRegex(vf.SnapshotError, "cannot resolve report path"):
+                vf.snapshot(Path("~/FINDINGS.md"))
+
+    def test_validate_path_reports_path_expansion_failure(self) -> None:
+        with mock.patch.object(
+            Path, "expanduser", side_effect=RuntimeError("unknown home")
+        ):
+            result = vf.validate_path(Path("~/FINDINGS.md"))
+        self.assertFalse(result.ok)
+        self.assertIn("cannot resolve report path", result.errors[0])
+
+    def test_unknown_field_on_defect_is_rejected(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Dependencies: None.",
+            "Dependencies: None.\n\nGuardrail indicators: Not a defect field.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Guardrail indicators' for record type"
+        )
+
+    def test_security_fields_are_unknown_outside_sec_records(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Dependencies: None.",
+            "Dependencies: None.\n\nThreat scenario: Only SEC records carry this.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Threat scenario' for record type"
+        )
+
+    def test_option_fields_are_unknown_outside_improvements(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Dependencies: None.",
+            "Dependencies: None.\n\nRewrite judgment: Options belong to improvements.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Rewrite judgment' for record type"
+        )
+
+    def test_option_local_field_under_wrong_option_is_rejected(self) -> None:
+        report = rf.build_report([rf.make_improvement()]).replace(
+            "Minimal changes: Document one canonical algorithm and add parity tests.",
+            "Rewrite judgment: This field belongs to Option D.",
+            1,
+        )
+        self.assert_invalid_with(report, "does not belong under Option A")
+
+    def test_option_local_field_before_option_a_is_rejected(self) -> None:
+        report = rf.build_report([rf.make_improvement()]).replace(
+            "### Option A — Keep and harden",
+            "Minimal changes: Misplaced before the option heading.\n\n"
+            "### Option A — Keep and harden",
+            1,
+        )
+        self.assert_invalid_with(report, "appears before Option A")
+
+    def test_unknown_option_heading_is_rejected(self) -> None:
+        report = rf.build_report([rf.make_improvement()]).replace(
+            "Recommendation: Do not pursue now; retain the incremental option for the stated trigger.",
+            "### Option E — Unsupported\n\n"
+            "Recommendation: Do not pursue now; retain the incremental option for the stated trigger.",
+            1,
+        )
+        self.assert_invalid_with(report, "must contain Options A-D exactly once")
+
+    def test_shared_option_fields_remain_valid_in_each_defined_scope(self) -> None:
+        report = rf.build_report([rf.make_improvement()])
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_other_decision_fields_are_unknown_on_feature(self) -> None:
+        report = rf.build_report([rf.make_feature()]).replace(
+            "Risks: Accidental weakening during unrelated refactors.",
+            "Risks: Accidental weakening during unrelated refactors.\n\n"
+            "Experiment hypothesis: Keep records do not carry experiment fields.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Experiment hypothesis' for record type"
+        )
+
+    def test_colon_led_prose_inside_value_is_rejected(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Minimal reproduction: Construct the invalid state and invoke the request handler.",
+            "Minimal reproduction:\nConstruct the invalid state.\n"
+            "Rollback: revert the commit afterwards.",
+            1,
+        )
+        self.assert_invalid_with(report, "has unknown field 'Rollback' for record type")
+
+    def test_registry_replacement_cycle_is_rejected(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-102",), seed="cycle-a"
+            ),
+            "COR-102": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-101",), seed="cycle-b"
+            ),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "form a cycle involving: COR-101, COR-102",
+        )
+
+    def test_registry_three_node_replacement_cycle_is_rejected(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-102",), seed="tri-a"
+            ),
+            "COR-102": rf.make_retired_entry(
+                status="consolidated", replacement_ids=("COR-103",), seed="tri-b"
+            ),
+            "COR-103": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-101",), seed="tri-c"
+            ),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "form a cycle involving: COR-101, COR-102, COR-103",
+        )
+
+    def test_registry_self_replacement_is_rejected(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-101",), seed="self"
+            )
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired), "COR-101 cannot replace itself"
+        )
+
+    def test_reverse_terminal_pruning_preserves_cycle_reachability(self) -> None:
+        edges = {
+            "terminal-parent": {"terminal"},
+            "terminal": set(),
+            "cycle-a": {"cycle-b"},
+            "cycle-b": {"cycle-a"},
+            "branch": {"terminal", "cycle-a"},
+        }
+        self.assertEqual(
+            vf._nodes_forming_or_reaching_cycles(edges),
+            {"cycle-a", "cycle-b", "branch"},
+        )
+
+    def test_invalid_retired_target_shape_does_not_crash_cycle_validation(
+        self,
+    ) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded",
+                replacement_ids=("COR-102",),
+                seed="source",
+            ),
+            "COR-102": rf.make_retired_entry(status="resolved", seed="target"),
+        }
+        retired["COR-102"]["replacement_ids"] = "not-an-array"
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "replacement_ids must be a string array",
+        )
+
+    def test_long_replacement_chain_uses_iterative_pruning(self) -> None:
+        count = 50_000
+        edges = {
+            f"COR-{index:05d}": {f"COR-{index + 1:05d}"} for index in range(count - 1)
+        }
+        edges[f"COR-{count - 1:05d}"] = set()
+        self.assertEqual(vf._nodes_forming_or_reaching_cycles(edges), set())
+
+    def test_registry_replacement_chain_to_resolved_is_valid(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-102",), seed="chain-a"
+            ),
+            "COR-102": rf.make_retired_entry(status="resolved", seed="chain-b"),
+        }
+        result = vf.validate_text(rf.build_report(retired=retired))
+        self.assertTrue(result.ok, result.errors)
+
+    def test_registry_replacement_into_active_is_valid(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-002",), seed="into-active"
+            ),
+        }
+        report = rf.build_report([rf.make_defect(record_id="COR-002")], retired=retired)
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_registry_superseded_requires_replacement(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(status="superseded", seed="bare-super"),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "status superseded requires at least one replacement ID",
+        )
+
+    def test_registry_consolidated_requires_replacement(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(status="consolidated", seed="bare-consol"),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "status consolidated requires at least one replacement ID",
+        )
+
+    def test_registry_resolved_allows_informational_replacement(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="resolved", replacement_ids=("COR-102",), seed="resolved-ptr"
+            ),
+            "COR-102": rf.make_retired_entry(status="invalidated", seed="resolved-tgt"),
+        }
+        result = vf.validate_text(rf.build_report(retired=retired))
+        self.assertTrue(result.ok, result.errors)
+
+    def test_metadata_missing_start_rejects_revalidated_yes(self) -> None:
+        self.assert_invalid_with(
+            rf.build_report(revalidated="Yes"),
+            "must be 'No — file did not exist' when Starting FINDINGS.md SHA-256 is MISSING",
+        )
+
+    def test_metadata_existing_digest_rejects_file_did_not_exist(self) -> None:
+        self.assert_invalid_with(
+            rf.build_report(starting_digest="sha256:" + "a" * 64),
+            "Starting FINDINGS.md SHA-256 must be MISSING when Existing report "
+            "revalidated is 'No — file did not exist'",
+        )
+
+    def test_metadata_partial_revalidation_rejects_complete(self) -> None:
+        self.assert_invalid_with(
+            rf.build_report(
+                starting_digest="sha256:" + "a" * 64,
+                revalidated="Partial — only sections 6 through 8 were rechecked",
+            ),
+            "Completion status must be Partial or Blocked when Existing report "
+            "revalidated is Partial",
+        )
+
+    def test_metadata_partial_revalidation_with_partial_completion_is_valid(
+        self,
+    ) -> None:
+        report = rf.build_report(
+            starting_digest="sha256:" + "a" * 64,
+            revalidated="Partial — only sections 6 through 8 were rechecked",
+            completion="Partial",
+            material_limitations="Only sections 6 through 8 were revalidated.",
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_metadata_revalidated_yes_with_digest_is_valid(self) -> None:
+        report = rf.build_report(
+            starting_digest="sha256:" + "b" * 64, revalidated="Yes"
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_snapshot_cli_metadata_only_and_out(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            data = rf.build_report().replace("\n", "\r\n").encode("utf-8")
+            path.write_bytes(data)
+            out = Path(temp_dir) / "snapshot.bin"
+            stdout = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stdout(stdout):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+                self.assertEqual(code, 0)
+                stdout.seek(0)
+                payload = json.loads(stdout.read())
+            finally:
+                stdout.close()
+            self.assertIsNone(payload["content"])
+            self.assertIsNone(payload["content_base64"])
+            self.assertEqual(payload["content_path"], str(out))
+            self.assertTrue(str(payload["content_sha256"]).startswith("sha256:"))
+            self.assertEqual(out.read_bytes(), data)
+
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stderr(stderr):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1, "--out must refuse an existing file")
+
+            stdout = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stdout(stdout):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--metadata-only", str(path)]
+                    )
+                self.assertEqual(code, 0)
+                stdout.seek(0)
+                payload = json.loads(stdout.read())
+            finally:
+                stdout.close()
+            self.assertIsNone(payload["content"])
+            self.assertEqual(payload["size"], len(data))
+
+            inside = repo / "copy.bin"
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stderr(stderr):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(inside), str(path)]
+                    )
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stderr.close()
+            self.assertEqual(code, 2, "--out inside the reviewed tree must refuse")
+            self.assertIn("outside the reviewed repository", message)
+            self.assertFalse(inside.exists())
+
+    def test_snapshot_out_refuses_swapped_output_directory(self) -> None:
+        if os.open not in os.supports_dir_fd:
+            self.skipTest("directory-descriptor support unavailable")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            outdir = base / "outdir"
+            outdir.mkdir()
+            moved = base / "moved"
+            out = outdir / "snapshot.bin"
+            probe = base / "symlink-probe"
+            try:
+                probe.symlink_to(repo)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"symlinks unavailable: {exc}")
+            probe.unlink()
+
+            real_resolve = Path.resolve
+            calls = {"outdir": 0}
+
+            def swapping_resolve(target: Path, strict: bool = False) -> Path:
+                if target == outdir:
+                    calls["outdir"] += 1
+                    if calls["outdir"] == 2 and not outdir.is_symlink():
+                        os.rename(outdir, moved)
+                        os.symlink(repo, outdir)
+                return real_resolve(target, strict=strict)
+
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(Path, "resolve", swapping_resolve),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1, message)
+            self.assertTrue(
+                "changed" in message or "outside the reviewed repository" in message,
+                message,
+            )
+            self.assertFalse((repo / "snapshot.bin").exists())
+
+    def test_snapshot_out_keeps_reviewed_repository_identity_pinned(self) -> None:
+        if os.open not in os.supports_dir_fd:
+            self.skipTest("directory-descriptor support unavailable")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            moved = base / "moved"
+            out = moved / "snapshot.bin"
+            original_snapshot = vf._snapshot_from_pinned
+
+            def swap_after_snapshot(directory, report_name: str):
+                result = original_snapshot(directory, report_name)
+                os.rename(repo, moved)
+                repo.mkdir()
+                return result
+
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(
+                        vf,
+                        "_snapshot_from_pinned",
+                        side_effect=swap_after_snapshot,
+                    ),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1, message)
+            self.assertIn("changed", message)
+            self.assertFalse(out.exists())
+
+    def test_snapshot_read_keeps_reviewed_repository_identity_pinned(self) -> None:
+        if os.open not in os.supports_dir_fd:
+            self.skipTest("directory-descriptor support unavailable")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            moved = base / "moved"
+            outside = base / "outside"
+            outside.mkdir()
+            secret = b"private bytes\n"
+            (outside / "FINDINGS.md").write_bytes(secret)
+            original_snapshot = vf._snapshot_from_pinned
+
+            def swap_before_snapshot(directory, report_name: str):
+                os.rename(repo, moved)
+                os.symlink(outside, repo)
+                return original_snapshot(directory, report_name)
+
+            stdout = tempfile.TemporaryFile(mode="w+")
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(
+                        vf,
+                        "_snapshot_from_pinned",
+                        side_effect=swap_before_snapshot,
+                    ),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    code = vf.main(["--snapshot", "--json", str(path)])
+                stdout.seek(0)
+                output = stdout.read()
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stdout.close()
+                stderr.close()
+            self.assertEqual(code, 1, message)
+            self.assertIn("changed", message)
+            self.assertNotIn(secret.decode("utf-8").strip(), output)
+
+    def test_snapshot_out_symlinked_parent_into_repo_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            outdir = base / "outdir"
+            try:
+                outdir.symlink_to(repo)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"symlinks unavailable: {exc}")
+            out = outdir / "copy.bin"
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stderr(stderr):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stderr.close()
+            self.assertEqual(code, 2, message)
+            self.assertIn("outside the reviewed repository", message)
+            self.assertFalse((repo / "copy.bin").exists())
+
+    def test_snapshot_out_without_dir_fd_support(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            data = rf.build_report().encode("utf-8")
+            path.write_bytes(data)
+            out = base / "snapshot.bin"
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(
+                        vf._REPORT_STORE,
+                        "_DESCRIPTOR_OPERATIONS_AVAILABLE",
+                        False,
+                    ),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1)
+            self.assertFalse(out.exists())
+
+    def test_snapshot_out_write_failure_leaves_no_partial_leaf(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            out = base / "snapshot.bin"
+
+            def partial_write(fd: int, data: bytes) -> None:
+                os.write(fd, data[:10])
+                raise OSError("simulated write failure")
+
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(
+                        vf._REPORT_STORE, "_write_all", side_effect=partial_write
+                    ),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1)
+            self.assertFalse(out.exists())
+            self.assertEqual(list(base.glob(".snapshot.bin.super-review.*.stage")), [])
+
+    def test_snapshot_out_foreign_replacement_is_not_reported_as_success(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            out = base / "snapshot.bin"
+            foreign = b"foreign bytes\n"
+            original_link = vf._REPORT_STORE.PinnedDirectory.link_from
+
+            def replace_after_link(
+                directory, source_directory, source: str, destination: str
+            ) -> None:
+                original_link(directory, source_directory, source, destination)
+                directory.unlink_leaf(destination)
+                flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                fd = directory.open_leaf(destination, flags, 0o644)
+                try:
+                    os.write(fd, foreign)
+                finally:
+                    os.close(fd)
+
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(
+                        vf._REPORT_STORE.PinnedDirectory,
+                        "link_from",
+                        autospec=True,
+                        side_effect=replace_after_link,
+                    ),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1)
+            self.assertEqual(out.read_bytes(), foreign)
+
+    def test_snapshot_flags_require_snapshot_mode(self) -> None:
+        stderr = tempfile.TemporaryFile(mode="w+")
+        try:
+            with contextlib.redirect_stderr(stderr):
+                code = vf.main(["--metadata-only", "irrelevant-path"])
+        finally:
+            stderr.close()
+        self.assertEqual(code, 2)
 
     def test_snapshot_cli_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

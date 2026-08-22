@@ -1,4 +1,4 @@
-# PHASE 12 — FRONTEND, UX, ACCESSIBILITY, AND CLIENT BEHAVIOR
+# Phase 12: frontend, UX, accessibility, and client behavior
 
 When a user interface exists, review:
 
@@ -61,5 +61,3 @@ Look for:
 
 Recommend UX or product changes where repository evidence reveals unnecessary
 friction.
-
-===============================================================================

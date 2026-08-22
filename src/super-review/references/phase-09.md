@@ -1,4 +1,4 @@
-# PHASE 9 — CONCURRENCY, ASYNCHRONY, AND DISTRIBUTED SYSTEMS
+# Phase 9: concurrency, asynchrony, and distributed systems
 
 Review:
 
@@ -76,5 +76,3 @@ For every distributed workflow, state the actual delivery and consistency model:
 - Eventual consistency.
 - Read-your-writes consistency.
 - Unknown or inconsistent.
-
-===============================================================================

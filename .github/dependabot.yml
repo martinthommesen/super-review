@@ -1,0 +1,20 @@
+# Root Python pins are duplicated in pyproject.toml and requirements-dev.txt.
+# Their parity regression requires Dependabot updates to keep both in sync.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directory: /cli
+    schedule:
+      interval: weekly

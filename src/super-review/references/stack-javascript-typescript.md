@@ -1,4 +1,4 @@
-# JavaScript and TypeScript Deep Checks
+# JavaScript and TypeScript deep checks
 
 Review applicable first-party JavaScript, TypeScript, Node.js, browser, React, server-rendering, bundler, and package-runtime behavior for:
 

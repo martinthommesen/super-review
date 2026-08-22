@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | { read -r f || exit 0; case \"$f\" in \"$CLAUDE_PROJECT_DIR\"/dist/*|dist/*|\"$CLAUDE_PROJECT_DIR\"/docs/ORIGINAL_REVIEW_PROMPT.md*|docs/ORIGINAL_REVIEW_PROMPT.md*) printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked by repo policy: dist/ is generated (edit src/super-review/ and run make build); docs/ORIGINAL_REVIEW_PROMPT.md is archival provenance.\"}}' ;; esac; }",
+            "command": "python3 -c 'import json,os,sys; d=json.load(sys.stdin); p=(d.get(\"tool_input\") or {}).get(\"file_path\") or \"\"; r=os.path.realpath(os.environ.get(\"CLAUDE_PROJECT_DIR\") or os.getcwd()); q=os.path.normcase(os.path.relpath(os.path.realpath(p if os.path.isabs(p) else os.path.join(r,p)),r)); sys.stdout.write(json.dumps({\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked by repo policy: dist/ is generated (edit src/super-review/ and run make build); docs/ORIGINAL_REVIEW_PROMPT.md is archival provenance.\"}})) if q.split(os.sep)[0]==os.path.normcase(\"dist\") or q==os.path.normcase(os.path.join(\"docs\",\"ORIGINAL_REVIEW_PROMPT.md\")) else None'",
             "timeout": 10
           }
         ]

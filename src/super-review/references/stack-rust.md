@@ -1,4 +1,4 @@
-# Rust Deep Checks
+# Rust deep checks
 
 Review applicable first-party Rust behavior for:
 

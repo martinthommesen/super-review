@@ -1,33 +1,29 @@
 #!/usr/bin/env python3
-"""Digest-gated, annotation-preserving commit of validated FINDINGS.md bytes.
+"""Validate and publish exact FINDINGS.md bytes with conflict recovery.
 
-The candidate is opened once without following its final path component. Those
-exact immutable bytes are validated, staged, and committed. The helper never
-re-reads the candidate path after validation.
+The helper pins the destination, serializes cooperating writers, and verifies
+the digest-gated target before and after publication. Failures detected after
+an existing-target exchange preserve the remaining recovery leaf instead of
+attempting a second exchange.
 """
 
 from __future__ import annotations
 
 import argparse
-import contextlib
-import hashlib
 import importlib.util
 import json
 import os
 import re
 import stat
 import sys
-import tempfile
-import time
 from pathlib import Path
 from types import ModuleType
-from typing import BinaryIO
 
 _SCRIPT_DIR = Path(__file__).resolve(strict=True).parent
 
 
 def _load_sibling(module_name: str, filename: str) -> ModuleType:
-    """Load a bundled sibling by canonical path, never by cwd or import search."""
+    """Load a bundled sibling by canonical path, never by import search."""
     leaf = _SCRIPT_DIR / filename
     try:
         info = os.lstat(leaf)
@@ -44,12 +40,21 @@ def _load_sibling(module_name: str, filename: str) -> ModuleType:
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load bundled sibling module: {sibling}")
     module = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get(module_name)
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except (Exception, SystemExit):
+        if previous is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous
+        raise
     return module
 
 
 _VALIDATOR = _load_sibling("_super_review_validate_findings", "validate_findings.py")
+_REPORT_STORE = _VALIDATOR._REPORT_STORE
 validate_bytes = _VALIDATOR.validate_bytes
 canonical_root_error = _VALIDATOR.canonical_root_error
 MAX_REPORT_BYTES = _VALIDATOR.MAX_REPORT_BYTES
@@ -58,13 +63,6 @@ EXIT_VALIDATION = 2
 EXIT_CONFLICT = 3
 EXIT_IO = 4
 
-HUMAN_START_BYTES_RE = re.compile(
-    rb'^<!-- SUPER-REVIEW:HUMAN-START id="([a-z0-9][a-z0-9._-]{0,63})" -->$'
-)
-HUMAN_END_BYTES_RE = re.compile(
-    rb'^<!-- SUPER-REVIEW:HUMAN-END id="([a-z0-9][a-z0-9._-]{0,63})" -->$'
-)
-FENCE_OPEN_BYTES_RE = re.compile(rb"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 DIGEST_RE = re.compile(r"^(?:sha256:)?([0-9a-fA-F]{64})$")
 
 
@@ -85,12 +83,15 @@ def _is_within(path: Path, parent: Path) -> bool:
 
 
 def _canonical_leaf(path: Path) -> Path:
-    expanded = path.expanduser()
+    try:
+        expanded = path.expanduser()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise CommitError(f"cannot expand candidate path {path}: {exc}") from exc
     if not expanded.name:
         raise CommitError(f"path has no filename: {path}")
     try:
         parent = expanded.parent.resolve(strict=True)
-    except OSError as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise CommitError(f"cannot resolve parent of {path}: {exc}") from exc
     return parent / expanded.name
 
@@ -104,10 +105,6 @@ def _normalize_expected(value: str) -> str:
             "expected digest must be MISSING, 64 hexadecimal characters, or sha256:<64 hex>"
         )
     return f"sha256:{match.group(1).lower()}"
-
-
-def _digest(data: bytes) -> str:
-    return f"sha256:{hashlib.sha256(data).hexdigest()}"
 
 
 def _same_identity(*infos: os.stat_result) -> bool:
@@ -185,94 +182,16 @@ def _read_regular_bytes_no_follow(
     return b"".join(chunks), opened
 
 
-def _read_target(target: Path) -> tuple[str, bytes, os.stat_result | None]:
-    try:
-        os.lstat(target)
-    except FileNotFoundError:
-        return "MISSING", b"", None
-    except OSError as exc:
-        raise CommitError(f"cannot inspect {target}: {exc}") from exc
-    data, info = _read_regular_bytes_no_follow(target, label="target")
-    return _digest(data), data, info
-
-
 def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
-    """Extract protected blocks byte-for-byte while ignoring fenced examples."""
-    lines = data.splitlines(keepends=True)
-    blocks: dict[str, bytes] = {}
-    open_id: str | None = None
-    start_index = 0
-    fence_char: bytes | None = None
-    fence_length = 0
-    fence_start = 0
-
-    for index, raw_line in enumerate(lines):
-        line = raw_line.rstrip(b"\r\n")
-        if open_id is not None:
-            start = HUMAN_START_BYTES_RE.fullmatch(line)
-            end = HUMAN_END_BYTES_RE.fullmatch(line)
-            if start:
-                block_id = start.group(1).decode("ascii")
-                raise CommitError(
-                    f"nested protected human block {block_id!r} inside {open_id!r}"
-                )
-            if end:
-                block_id = end.group(1).decode("ascii")
-                if block_id != open_id:
-                    raise CommitError(
-                        f"protected human block end {block_id!r} does not match open block {open_id!r}"
-                    )
-                blocks[block_id] = b"".join(lines[start_index : index + 1])
-                open_id = None
-                start_index = 0
-            continue
-
-        if fence_char is not None:
-            close_re = re.compile(
-                rb"^ {0,3}"
-                + re.escape(fence_char)
-                + rb"{"
-                + str(fence_length).encode("ascii")
-                + rb",}[ \t]*$"
-            )
-            if close_re.fullmatch(line):
-                fence_char = None
-                fence_length = 0
-                fence_start = 0
-            continue
-
-        fence = FENCE_OPEN_BYTES_RE.fullmatch(line)
-        if fence:
-            marker = fence.group("marker")
-            info = fence.group("info")
-            if not (marker[:1] == b"`" and b"`" in info):
-                fence_char = marker[:1]
-                fence_length = len(marker)
-                fence_start = index + 1
-                continue
-
-        start = HUMAN_START_BYTES_RE.fullmatch(line)
-        end = HUMAN_END_BYTES_RE.fullmatch(line)
-        if start:
-            block_id = start.group(1).decode("ascii")
-            if block_id in blocks:
-                raise CommitError(f"duplicate protected human block id {block_id!r}")
-            open_id = block_id
-            start_index = index
-        elif end:
-            block_id = end.group(1).decode("ascii")
-            raise CommitError(f"protected human block end {block_id!r} has no start")
-
-    if open_id is not None:
-        raise CommitError(f"protected human block {open_id!r} is not closed")
-    if fence_char is not None:
-        raise CommitError(
-            f"fenced code block beginning at line {fence_start} is not closed"
-        )
-    return blocks
+    """Extract exact protected blocks with the validator's canonical scanner."""
+    scan = _VALIDATOR.scan_report_structure(data)
+    if scan.errors:
+        raise CommitError("; ".join(scan.errors))
+    return {block.block_id: block.raw for block in scan.blocks}
 
 
 def _verify_human_blocks(current: bytes, candidate: bytes) -> None:
+    """Reject a candidate that drops or changes a protected block."""
     current_blocks = _parse_human_blocks_bytes(current)
     candidate_blocks = _parse_human_blocks_bytes(candidate)
     for block_id, raw in current_blocks.items():
@@ -282,125 +201,86 @@ def _verify_human_blocks(current: bytes, candidate: bytes) -> None:
             raise CommitError(f"candidate changes protected human block {block_id!r}")
 
 
-class AdvisoryLock:
-    """Out-of-repository advisory lock shared by bundled commit invocations."""
-
-    def __init__(self, root: Path, timeout_seconds: float) -> None:
-        key = hashlib.sha256(os.fsencode(str(root))).hexdigest()
-        uid = getattr(os, "getuid", lambda: "user")()
-        lock_dir = Path(tempfile.gettempdir()) / f"super-review-locks-{uid}"
-        lock_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        info = os.lstat(lock_dir)
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-            raise CommitError(f"unsafe advisory-lock directory: {lock_dir}")
-        with contextlib.suppress(OSError):
-            os.chmod(lock_dir, 0o700)
-        self.path = lock_dir / f"{key}.lock"
-        self.timeout_seconds = timeout_seconds
-        self.handle: BinaryIO | None = None
-
-    def __enter__(self) -> "AdvisoryLock":
-        flags = (
-            os.O_RDWR
-            | os.O_CREAT
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_BINARY", 0)
+def _open_store(repo_root: Path) -> object:
+    try:
+        return _REPORT_STORE.ReportStore.open(
+            repo_root, max_bytes=MAX_REPORT_BYTES, mutation=False
         )
-        flags |= getattr(os, "O_NOFOLLOW", 0)
-        try:
-            fd = os.open(self.path, flags, 0o600)
-        except OSError as exc:
-            raise CommitError(f"cannot open advisory lock {self.path}: {exc}") from exc
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
-            os.close(fd)
-            raise CommitError(f"advisory lock is not a regular file: {self.path}")
-        self.handle = os.fdopen(fd, "r+b", closefd=True)
-        if self.handle.seek(0, os.SEEK_END) == 0:
-            self.handle.write(b"\0")
-            self.handle.flush()
-        deadline = time.monotonic() + self.timeout_seconds
-
-        if os.name == "nt":
-            import msvcrt
-
-            while True:
-                try:
-                    self.handle.seek(0)
-                    msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
-                    break
-                except OSError:
-                    if time.monotonic() >= deadline:
-                        raise ConflictError(
-                            f"timed out acquiring advisory lock {self.path}"
-                        )
-                    time.sleep(0.05)
-        else:
-            import fcntl
-
-            while True:
-                try:
-                    fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    break
-                except BlockingIOError:
-                    if time.monotonic() >= deadline:
-                        raise ConflictError(
-                            f"timed out acquiring advisory lock {self.path}"
-                        )
-                    time.sleep(0.05)
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
-        if self.handle is None:
-            return
-        try:
-            if os.name == "nt":
-                import msvcrt
-
-                self.handle.seek(0)
-                with contextlib.suppress(OSError):
-                    msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-
-                with contextlib.suppress(OSError):
-                    fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
-        finally:
-            self.handle.close()
-            self.handle = None
+    except _REPORT_STORE.UnsafePathError as exc:
+        raise CommitError(str(exc)) from exc
+    except _REPORT_STORE.StoreConflictError as exc:
+        raise ConflictError(str(exc)) from exc
 
 
-def _write_temp(root: Path, candidate: bytes, mode: int | None) -> Path:
-    fd, raw_path = tempfile.mkstemp(
-        prefix=".FINDINGS.md.super-review.", suffix=".tmp", dir=root
+def _commit_captured(
+    *,
+    store: object,
+    candidate_bytes: bytes,
+    expected_digest: str,
+    lock_timeout: float,
+    dry_run: bool,
+    source: str,
+    candidate_stat: os.stat_result | None,
+) -> dict[str, str]:
+    if len(candidate_bytes) > MAX_REPORT_BYTES:
+        raise CommitError(f"{source} exceeds {MAX_REPORT_BYTES} byte safety limit")
+    validation = validate_bytes(candidate_bytes, source=source)
+    if not validation.ok:
+        detail = "\n".join(f"  - {item}" for item in validation.errors)
+        raise CommitError(f"candidate report validation failed:\n{detail}")
+
+    assert isinstance(store, _REPORT_STORE.ReportStore)
+    try:
+        store.directory.assert_path_binding()
+    except _REPORT_STORE.StoreConflictError as exc:
+        raise ConflictError(str(exc)) from exc
+    location_error = canonical_root_error(
+        candidate_bytes.decode("utf-8"),
+        store.root,
+        expected_is_resolved=True,
     )
-    temp_path = Path(raw_path)
+    if location_error:
+        raise CommitError(
+            f"candidate does not belong to this repository: {location_error}"
+        )
     try:
-        os.fchmod(fd, stat.S_IMODE(mode if mode is not None else 0o644))
-        with os.fdopen(fd, "wb", closefd=True) as handle:
-            handle.write(candidate)
-            handle.flush()
-            os.fsync(handle.fileno())
-        return temp_path
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.close(fd)
-        with contextlib.suppress(OSError):
-            temp_path.unlink()
-        raise
+        store.directory.assert_path_binding()
+        if not dry_run:
+            store.directory.require_mutation_support()
+    except _REPORT_STORE.StoreConflictError as exc:
+        raise ConflictError(str(exc)) from exc
 
+    candidate = _REPORT_STORE.ExactPayload.from_bytes(candidate_bytes)
+    candidate_identity = None
+    if candidate_stat is not None:
+        captured_identity = _REPORT_STORE.FileIdentity.from_stat(candidate_stat)
+        if captured_identity.meaningful:
+            candidate_identity = captured_identity
+    try:
+        receipt = store.compare_and_publish(
+            candidate=candidate,
+            expected_digest=_normalize_expected(expected_digest),
+            candidate_identity=candidate_identity,
+            lock_timeout=max(0.0, lock_timeout),
+            dry_run=dry_run,
+            guard_current=lambda current: _verify_human_blocks(
+                current, candidate_bytes
+            ),
+        )
+    except _REPORT_STORE.UnsafePathError as exc:
+        raise CommitError(str(exc)) from exc
+    except _REPORT_STORE.StoreConflictError as exc:
+        raise ConflictError(str(exc)) from exc
 
-def _fsync_directory(path: Path) -> None:
-    flags = getattr(os, "O_DIRECTORY", 0) | os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
-    try:
-        fd = os.open(path, flags)
-    except OSError:
-        return
-    try:
-        with contextlib.suppress(OSError):
-            os.fsync(fd)
-    finally:
-        os.close(fd)
+    result = {
+        "path": str(store.root / store.TARGET),
+        "previous_sha256": receipt.previous.digest,
+        "candidate_sha256": candidate.digest,
+        "status": receipt.status,
+    }
+    if receipt.committed is not None:
+        result["committed_sha256"] = receipt.committed.digest
+    return result
 
 
 def commit_bytes(
@@ -413,117 +293,19 @@ def commit_bytes(
     source: str = "<bytes>",
     candidate_stat: os.stat_result | None = None,
 ) -> dict[str, str]:
-    """Validate and commit immutable candidate bytes under digest concurrency.
-
-    This is the single write core. Path-based ``commit()`` reads the candidate
-    once without following its final component, then delegates here. Optional
-    ``candidate_stat`` enables the path-only hard-link-to-target refusal.
-    """
-    if len(candidate_bytes) > MAX_REPORT_BYTES:
-        raise CommitError(f"{source} exceeds {MAX_REPORT_BYTES} byte safety limit")
-
-    requested_root = repo_root.expanduser().absolute()
-    root = requested_root.resolve(strict=True)
-    if not root.is_dir():
-        raise CommitError(f"repository root is not a directory: {root}")
-
-    target = root / "FINDINGS.md"
-    validation = validate_bytes(candidate_bytes, source=source)
-    if not validation.ok:
-        detail = "\n".join(f"  - {item}" for item in validation.errors)
-        raise CommitError(f"candidate report validation failed:\n{detail}")
-
-    # The candidate must belong to this repository. A report generated for a
-    # different root (for example, two concurrent reviews colliding on a shared
-    # candidate path) is refused rather than written into the wrong FINDINGS.md.
-    location_error = canonical_root_error(
-        candidate_bytes.decode("utf-8"), requested_root
-    )
-    if location_error:
-        raise CommitError(
-            f"candidate does not belong to this repository: {location_error}"
+    """Validate and publish one immutable candidate byte sequence."""
+    store = _open_store(repo_root)
+    assert isinstance(store, _REPORT_STORE.ReportStore)
+    with store:
+        return _commit_captured(
+            store=store,
+            candidate_bytes=candidate_bytes,
+            expected_digest=expected_digest,
+            lock_timeout=lock_timeout,
+            dry_run=dry_run,
+            source=source,
+            candidate_stat=candidate_stat,
         )
-    candidate_digest = _digest(candidate_bytes)
-
-    with AdvisoryLock(root, lock_timeout):
-        actual_digest, current_bytes, current_info = _read_target(target)
-        if (
-            candidate_stat is not None
-            and current_info is not None
-            and _same_identity(candidate_stat, current_info)
-        ):
-            raise CommitError("candidate must not be the target through a hard link")
-        if actual_digest != expected_digest:
-            raise ConflictError(
-                f"FINDINGS.md changed: expected {expected_digest}, found {actual_digest}; reread, revalidate, and regenerate"
-            )
-        _verify_human_blocks(current_bytes, candidate_bytes)
-
-        second_digest, second_bytes, second_info = _read_target(target)
-        if second_digest != expected_digest:
-            raise ConflictError(
-                f"FINDINGS.md changed before replacement: expected {expected_digest}, found {second_digest}"
-            )
-        _verify_human_blocks(second_bytes, candidate_bytes)
-
-        if dry_run:
-            return {
-                "path": str(target),
-                "previous_sha256": actual_digest,
-                "candidate_sha256": candidate_digest,
-                "status": "validated-dry-run",
-            }
-
-        temp_path = _write_temp(
-            root,
-            candidate_bytes,
-            second_info.st_mode if second_info is not None else 0o644,
-        )
-        try:
-            final_digest, final_bytes, _ = _read_target(target)
-            if final_digest != expected_digest:
-                raise ConflictError(
-                    "FINDINGS.md changed after candidate staging; refusing to overwrite concurrent edits"
-                )
-            _verify_human_blocks(final_bytes, candidate_bytes)
-
-            if expected_digest == "MISSING":
-                try:
-                    os.link(temp_path, target, follow_symlinks=False)
-                except FileExistsError as exc:
-                    raise ConflictError(
-                        "FINDINGS.md appeared before creation; refusing to overwrite it"
-                    ) from exc
-                except (NotImplementedError, TypeError):
-                    # Platforms lacking follow_symlinks support still get an atomic
-                    # create-if-absent operation from link when the target is absent.
-                    try:
-                        os.link(temp_path, target)
-                    except FileExistsError as exc:
-                        raise ConflictError(
-                            "FINDINGS.md appeared before creation; refusing to overwrite it"
-                        ) from exc
-                temp_path.unlink()
-            else:
-                os.replace(temp_path, target)
-            _fsync_directory(root)
-        finally:
-            with contextlib.suppress(FileNotFoundError):
-                temp_path.unlink()
-
-        committed_digest, committed_bytes, _ = _read_target(target)
-        if committed_digest != candidate_digest or committed_bytes != candidate_bytes:
-            raise CommitError(
-                f"post-write verification failed: expected {candidate_digest}, found {committed_digest}"
-            )
-
-    return {
-        "path": str(target),
-        "previous_sha256": actual_digest,
-        "candidate_sha256": candidate_digest,
-        "committed_sha256": candidate_digest,
-        "status": "committed",
-    }
 
 
 def commit(
@@ -534,33 +316,28 @@ def commit(
     lock_timeout: float,
     dry_run: bool,
 ) -> dict[str, str]:
-    """Path front-end: read the candidate once, then delegate to ``commit_bytes``."""
-    requested_root = repo_root.expanduser().absolute()
-    root = requested_root.resolve(strict=True)
-    if not root.is_dir():
-        raise CommitError(f"repository root is not a directory: {root}")
-
-    target = root / "FINDINGS.md"
-    candidate = _canonical_leaf(candidate_path)
-    if candidate == target:
-        raise CommitError("candidate must be generated outside the target path")
-    if _is_within(candidate, root):
-        raise CommitError("candidate must be outside the repository root")
-
-    # Open once, without following the final component. Validate and commit these
-    # exact bytes even if the path is renamed or replaced afterward.
-    candidate_bytes, candidate_info = _read_regular_bytes_no_follow(
-        candidate, label="candidate"
-    )
-    return commit_bytes(
-        repo_root=repo_root,
-        candidate_bytes=candidate_bytes,
-        expected_digest=expected_digest,
-        lock_timeout=lock_timeout,
-        dry_run=dry_run,
-        source=str(candidate),
-        candidate_stat=candidate_info,
-    )
+    """Read an outside-repository candidate once, then publish those bytes."""
+    store = _open_store(repo_root)
+    assert isinstance(store, _REPORT_STORE.ReportStore)
+    with store:
+        target = store.root / store.TARGET
+        candidate = _canonical_leaf(candidate_path)
+        if candidate == target:
+            raise CommitError("candidate must be generated outside the target path")
+        if _is_within(candidate, store.root):
+            raise CommitError("candidate must be outside the repository root")
+        candidate_bytes, candidate_info = _read_regular_bytes_no_follow(
+            candidate, label="candidate"
+        )
+        return _commit_captured(
+            store=store,
+            candidate_bytes=candidate_bytes,
+            expected_digest=expected_digest,
+            lock_timeout=lock_timeout,
+            dry_run=dry_run,
+            source=str(candidate),
+            candidate_stat=candidate_info,
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:

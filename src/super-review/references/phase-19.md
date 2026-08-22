@@ -1,4 +1,4 @@
-# PHASE 19 — DOCUMENTATION AND KNOWLEDGE QUALITY
+# Phase 19: documentation and knowledge quality
 
 Review:
 
@@ -46,5 +46,3 @@ Recommend documentation changes by audience:
 - Security reviewers.
 - Support staff.
 - Future maintainers.
-
-===============================================================================

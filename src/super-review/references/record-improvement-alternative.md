@@ -1,4 +1,4 @@
-# Template B — Improvement or alternative
+# Template B: improvement or alternative
 
 Use this when the current behavior is technically acceptable but a materially simpler, clearer, safer, faster, more scalable, more maintainable, or operationally stronger approach is supported by evidence. Do not label it as a defect.
 
@@ -137,10 +137,10 @@ Validation:
 <Measurement, tests, benchmarks, profiling, failure checks, and acceptance criteria.>
 
 Effort:
-<Small | Medium | Large | Program-level.>
+<Small | Medium | Large | Program-level, optionally followed by ": <scope basis>">
 
 Risk of the proposed change:
-<Low | Medium | High, with explanation.>
+<Low | Medium | High, optionally followed by ": <explanation>">
 
 Dependencies:
 <Prerequisites.>
@@ -149,4 +149,5 @@ Open questions:
 <Material questions, or Not applicable with reason.>
 ```
 
-Options A–D are analytical lenses, not a quota for speculative prose. An option can be `Not applicable` only with a concrete evidence-based reason.
+Options A through D guide analysis. They are not a quota. Use `Not applicable`
+only with a concrete evidence-based reason.

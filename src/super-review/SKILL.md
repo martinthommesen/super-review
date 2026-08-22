@@ -5,7 +5,7 @@ description: Performs an exhaustive, evidence-based whole-repository engineering
 
 # Super Review
 
-Version: 1.5.0
+Version: 1.6.0
 
 Compatibility: Requires filesystem access to the target repository or directory and permission to create or update its root `FINDINGS.md`. Git and code-search tools are recommended. Python 3 is recommended for the bundled fingerprint, report-validation, safe-write, and test scripts.
 
@@ -35,12 +35,6 @@ python3 -I "$SKILL_ROOT/scripts/<helper>.py" ...
 
 Use the platform-equivalent isolated Python invocation when `python3 -I` is unavailable. Do not substitute a same-named repository script.
 
-## Optional MCP companion
-
-An optional companion MCP may front the FINDINGS helpers. It is never the default trust path: default every helper invocation to the skill-root CLI above; do not prefer MCP merely because tools are visible. Use companion tools only when the host attests the *active resolved* server's provenance and the user affirms companion use for this run; never trust server self-reports. After any MCP commit that claims success, always post-validate `<canonical-root>/FINDINGS.md` with the skill-root CLI. On hosts without a write-authorization gate, keep commit on the CLI. Do not install or honor a project-scoped companion registration inside a reviewed repository.
-
-Wire contract, size bound, host write-gate split, and CLI fallback details are normative in [the findings lifecycle](references/findings-lifecycle.md) and [the quality bar](references/quality-bar.md). See `companion/README.md` in the workbench for install and launch.
-
 ## Non-negotiable output invariant
 
 Every valid invocation must create or refresh exactly:
@@ -62,7 +56,12 @@ Do not preload the protocol. At activation, load only:
 
 Before any repository-defined command, load [the untrusted-repository command-safety gate](references/command-safety.md).
 
-Consider phases 0–22 in order and apply the applicability guide before deep loading. Load exactly one applicable phase file immediately before performing that phase. A conditional phase may be closed without loading its deep reference only after the guide's bounded absence checks establish that no relevant first-party surface exists. Record `Not applicable — <specific evidence basis>` and reopen the phase if later evidence changes applicability.
+Consider phases 0 through 22 in order and apply the applicability guide before
+deep loading. Load one applicable phase file immediately before performing that
+phase. Close a conditional phase without its deep reference only after bounded
+searches establish that no relevant first-party code or behavior exists. Record
+`Not applicable: <specific evidence basis>` and reopen the phase if later
+evidence changes applicability.
 
 | Phase | Reference |
 |---|---|
@@ -101,13 +100,13 @@ All referenced rules are normative. Progressive loading changes when instruction
 1. Resolve instructions, authorization, mode, target, root, exclusions, compatibility contracts, and supplied context.
 2. Snapshot repository state and the exact `FINDINGS.md` bytes/digest. Preserve protected human blocks and build the prior-report revalidation ledger.
 3. Establish command safety before executable validation.
-4. Perform phases 0–22 in order while maintaining coverage and evidence ledgers.
+4. Perform phases 0 through 22 in order while maintaining coverage and evidence ledgers.
 5. Checkpoint long-running analysis outside the repository, bound to root, revision, worktree state, and starting report digest; invalidate stale phase results after changes.
 6. Revalidate every prior claim, then perform independent current-repository discovery. The old report never limits coverage.
 7. Canonicalize by root cause or decision basis; compute deterministic fingerprints; preserve active and retired IDs; derive summaries and roadmap from canonical records.
-8. Generate the candidate outside the repository. Run `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>` and fix every error. When D14 companion use is affirmed and content is within the MCP size bound, `validate_findings` with UTF-8 `content` + `content_sha256` is an allowed front-end to the same validator; the CLI remains the default and the fallback.
-9. Reread the current report immediately before replacement (`python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --snapshot --json <canonical-root>/FINDINGS.md` or an affirmed companion `snapshot_findings` with the repository root). Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write that also refuses a candidate whose stated canonical root belongs to a different repository. An affirmed companion `commit_findings` (host write-gate only) is such a front-end to `commit_bytes`; otherwise keep commit on the CLI. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
-10. Reread the committed file, rerun the absolute-path validator with `--canonical-root <canonical-root>` via the skill-root CLI (mandatory even after an MCP commit), and verify the stated canonical root, revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
+8. Generate the candidate outside the repository. Run `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>` and fix every error.
+9. Reread the current report immediately before replacement (`python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --snapshot --metadata-only --json <canonical-root>/FINDINGS.md`; add `--out <file-outside-repo>` instead of `--metadata-only` when the exact bytes are needed for annotation merging). Use `python3 -I "$SKILL_ROOT/scripts/commit_findings.py" ...` or a demonstrably equivalent exact-byte, digest-gated, annotation-preserving atomic write that also refuses a candidate whose stated canonical root belongs to a different repository. On conflict, reread, revalidate, merge, regenerate, and retry; never force an overwrite.
+10. Reread the committed file, rerun the absolute-path validator with `--canonical-root <canonical-root>` via the skill-root CLI, and verify the stated canonical root, revision, completion status, IDs, summaries, roadmap, validation record, annotations, and ending.
 
 ## Review modes and evidence
 
@@ -115,7 +114,11 @@ Use the requested mode; default to `REVIEW ONLY`. The root `FINDINGS.md` update 
 
 Confirmed and high-confidence records require current repository evidence. Distinguish facts, supported inferences, hypotheses, and unavailable evidence. Trace important behavior through callers, consumers, tests, schemas, configuration, persistence, deployment, failures, retries, cleanup, compensation, and compatibility paths. Manually verify scanner output and protect secrets and personal data.
 
-Exhaustiveness means every meaningful first-party area and required review dimension is considered; it does not mean manufacturing findings. For unsupported or inapplicable fields, alternatives, categories, or subsystem analyses, write `Not applicable — <specific evidence-based reason>` or `Not established — <missing evidence>`.
+Exhaustiveness means considering every meaningful first-party area and required
+review dimension. It does not mean inventing findings. For unsupported or
+inapplicable fields, alternatives, categories, or subsystem analyses, write
+`Not applicable: <specific evidence-based reason>` or `Not established:
+<missing evidence>`.
 
 ## Completion response
 

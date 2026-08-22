@@ -16,3 +16,8 @@ indent_size = 2
 
 [Makefile]
 indent_style = tab
+
+# This checksum-pinned provenance file intentionally has no trailing newline.
+[docs/ORIGINAL_REVIEW_PROMPT.md]
+insert_final_newline = false
+trim_trailing_whitespace = false

@@ -1,4 +1,4 @@
-# PHASE 8 — APIS, CONTRACTS, SCHEMAS, AND EXTERNAL INTEGRATIONS
+# Phase 8: APIs, contracts, schemas, and external integrations
 
 Review:
 
@@ -74,5 +74,3 @@ Look for contracts where:
 - Versioning exists but is not enforced.
 - Deprecated versions have no removal plan.
 - Generated code is stale relative to source schemas.
-
-===============================================================================

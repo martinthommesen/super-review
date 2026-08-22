@@ -1,4 +1,4 @@
-# C# and .NET Deep Checks
+# C# and .NET deep checks
 
 Review applicable first-party C#, .NET, ASP.NET, and Entity Framework behavior for:
 

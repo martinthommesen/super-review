@@ -1,4 +1,4 @@
-# PHASE 3 — ARCHITECTURE AND SYSTEM DESIGN
+# Phase 3: architecture and system design
 
 Evaluate:
 
@@ -30,7 +30,7 @@ Look for:
 - Framework concerns leaking into domain logic.
 - Infrastructure details leaking through interfaces.
 - Overly broad utility modules.
-- “God” classes or services.
+- "God" classes or services.
 - Modules with unclear ownership.
 - Abstractions that merely forward calls.
 - Interfaces with only one artificial implementation.
@@ -70,5 +70,3 @@ For each major subsystem, answer:
 
 Do not recommend a rewrite without demonstrating why incremental improvement is
 insufficient.
-
-===============================================================================

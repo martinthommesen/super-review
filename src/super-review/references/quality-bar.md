@@ -1,4 +1,4 @@
-# Quality Bar, Anti-Patterns, and Final Gates
+# Quality bar and final gates
 
 Load this file only after the phase work and candidate report are complete.
 
@@ -24,7 +24,7 @@ The review is not complete unless it:
 - Records validation performed and validation not performed.
 - Identifies positive patterns worth preserving.
 - Produces a dependency-aware, prioritized roadmap.
-- Completes phases 0–22 in order and records the reason for any inapplicable, sampled, excluded, or unvalidated area.
+- Completes phases 0 through 22 in order and records the reason for any inapplicable, sampled, excluded, or unvalidated area.
 - Revalidates every existing report claim before merging new results.
 - Performs current-repository discovery independently of the old report.
 - Uses separate canonical records for defects and risks, improvements and alternatives, feature decisions, and positive patterns.
@@ -42,8 +42,8 @@ Do not:
 
 - Produce a generic checklist with no repository-specific conclusions.
 - Report formatting preferences as major findings.
-- Recommend “add more tests” without naming exact missing behavior.
-- Recommend “improve error handling” without identifying concrete failure paths.
+- Recommend "add more tests" without naming exact missing behavior.
+- Recommend "improve error handling" without identifying concrete failure paths.
 - Recommend caching without identifying repeated expensive work and invalidation requirements.
 - Recommend microservices without a concrete scaling, ownership, deployment, or isolation need.
 - Recommend combining services without analyzing deployment and ownership consequences.
@@ -69,7 +69,7 @@ Do not:
 - Suggest broad abstractions with no demonstrated consumers.
 - Preserve unnecessary complexity solely because it is established.
 - Replace working code without demonstrating material benefit.
-- Manufacture options A–D or feature decisions to satisfy a template.
+- Manufacture options A through D or feature decisions to satisfy a template.
 - Omit a field silently when `Not applicable` or `Not established` is the truthful answer.
 - Blindly append beneath stale report content.
 - Reuse a retired ID.
@@ -88,12 +88,13 @@ Before writing the repository file:
    python3 -I "$SKILL_ROOT/scripts/validate_findings.py" <candidate-path>
    ```
 
-3. Fix every error. Do not weaken the script or remove legitimate records merely to make it pass. When D14 companion use is affirmed and content is within the MCP size bound, companion `validate_findings` (UTF-8 `content` + `content_sha256`) is an allowed front-end; default to the CLI and fall back to the CLI above the MCP size bound.
+3. Fix every error. Do not weaken the script or remove legitimate records merely to make it pass.
 4. Confirm all active fingerprints with `python3 -I "$SKILL_ROOT/scripts/finding_fingerprint.py" ...` or equivalent deterministic computation.
 5. Confirm the candidate contains every protected human block from the latest current report exactly.
 6. Confirm each Critical and High defect or risk appears in `# 5. Top Findings` and `# 14. Prioritized Roadmap`.
 7. Confirm every roadmap and summary ID resolves to one active canonical record.
-8. Confirm retired IDs occur only in the registry, validation history, or explicit supersession references—not as active work.
+8. Confirm retired IDs occur only in the registry, validation history, or
+   explicit supersession references, never as active work.
 
 ## Safe-write gate
 
@@ -106,14 +107,14 @@ python3 -I "$SKILL_ROOT/scripts/commit_findings.py" \
   --expected-sha256 <digest-or-MISSING>
 ```
 
-A digest conflict is not a reason to force the write. Reopen and revalidate the latest file, regenerate, and retry. The run remains incomplete until the canonical report is safely refreshed or the unresolved conflict is reported without data loss. An affirmed companion `commit_findings` (host write-gate only) may call the same `commit_bytes` core with UTF-8 `content` + `content_sha256`; otherwise keep commit on the CLI.
+A digest conflict is not a reason to force the write. Reopen and revalidate the latest file, regenerate, and retry. The run remains incomplete until the canonical report is safely refreshed or the unresolved conflict is reported without data loss.
 
 ## Post-write gate
 
 After the safe write:
 
 1. Confirm the target is the root `FINDINGS.md`, not a symlink or nested copy.
-2. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --canonical-root <canonical-root> <canonical-root>/FINDINGS.md` against the committed file. The `--canonical-root` flag confirms the committed file resolves to `<canonical-root>/FINDINGS.md` and that its stated `Canonical root` names that same repository. This CLI pass is mandatory even when the commit went through the optional MCP companion.
+2. Rerun `python3 -I "$SKILL_ROOT/scripts/validate_findings.py" --canonical-root <canonical-root> <canonical-root>/FINDINGS.md` against the committed file. The `--canonical-root` flag confirms the committed file resolves to `<canonical-root>/FINDINGS.md` and that its stated `Canonical root` names that same repository.
 3. Compare the committed digest with the candidate digest.
 4. Reread the beginning, registry, report metadata, top table, every canonical-record section, roadmap, validation section, positive patterns, protected human blocks, and ending.
 5. Reopen every Critical and High finding's primary evidence and a representative sample of other records.

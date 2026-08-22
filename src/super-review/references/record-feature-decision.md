@@ -1,4 +1,4 @@
-# Template C — Feature decision
+# Template C: feature decision
 
 Use this for add, improve, simplify, merge, replace, deprecate, remove, keep, experiment, or investigate decisions. Every decision must be tied to repository evidence or explicitly labeled as requiring product validation.
 

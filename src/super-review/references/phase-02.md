@@ -1,4 +1,4 @@
-# PHASE 2 — PRODUCT, DOMAIN, USER, AND FEATURE INVENTORY
+# Phase 2: product, domain, user, and feature inventory
 
 Before recommending features, understand what the product currently does.
 
@@ -95,5 +95,3 @@ PHASE 2 DELIVERABLES:
 - Operator-journey map.
 - Initial list of feature gaps.
 - Initial list of redundant or questionable features.
-
-===============================================================================

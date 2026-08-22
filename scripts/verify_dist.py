@@ -31,6 +31,10 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _normalized_mode(source_mode: int) -> int:
+    return 0o755 if source_mode & 0o111 else 0o644
+
+
 def _source_files() -> dict[str, Path]:
     result: dict[str, Path] = {}
     for path in sorted(SOURCE_ROOT.rglob("*"), key=lambda item: item.as_posix()):
@@ -67,6 +71,7 @@ def _run(command: list[str], cwd: Path) -> None:
 
 
 def verify(artifact: Path, *, run_tests: bool = True) -> str:
+    """Verify archive contents and optionally run the extracted tests."""
     artifact = artifact.expanduser().resolve(strict=True)
     artifact_info = artifact.lstat()
     if stat.S_ISLNK(artifact_info.st_mode) or not stat.S_ISREG(artifact_info.st_mode):
@@ -109,9 +114,12 @@ def verify(artifact: Path, *, run_tests: bool = True) -> str:
                 )
             archive_mode = (seen[relative].external_attr >> 16) & 0o777
             source_mode = stat.S_IMODE(source.stat().st_mode)
-            if archive_mode != source_mode:
+            # Verify against the builder's normalized expectation, not the
+            # umask-dependent working-tree mode.
+            normalized_mode = _normalized_mode(source_mode)
+            if archive_mode != normalized_mode:
                 raise RuntimeError(
-                    f"mode mismatch for {relative}: source={oct(source_mode)}, archive={oct(archive_mode)}"
+                    f"mode mismatch for {relative}: expected={oct(normalized_mode)}, archive={oct(archive_mode)}"
                 )
             expected_executable = relative in EXECUTABLE_PATHS
             if bool(archive_mode & 0o111) != expected_executable:

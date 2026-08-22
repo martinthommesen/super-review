@@ -1,4 +1,4 @@
-# Java and Kotlin Deep Checks
+# Java and Kotlin deep checks
 
 Review applicable first-party JVM, Java, Kotlin, and framework behavior for:
 

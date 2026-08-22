@@ -45,11 +45,15 @@ def _iter_source_files() -> list[Path]:
     return files
 
 
+def _normalized_mode(source_mode: int) -> int:
+    return 0o755 if source_mode & 0o111 else 0o644
+
+
 def _zip_info(path: Path) -> zipfile.ZipInfo:
     relative = path.relative_to(SOURCE_ROOT).as_posix()
     info = zipfile.ZipInfo(f"{ARCHIVE_ROOT}/{relative}", date_time=ZIP_TIME)
     info.create_system = 3
-    mode = stat.S_IMODE(path.stat().st_mode)
+    mode = _normalized_mode(stat.S_IMODE(path.stat().st_mode))
     info.external_attr = (stat.S_IFREG | mode) << 16
     info.compress_type = zipfile.ZIP_DEFLATED
     info.flag_bits |= 0x800

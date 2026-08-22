@@ -1,4 +1,4 @@
-# Template A — Defect or risk
+# Template A: defect or risk
 
 Use this for confirmed defects, probable defects, security weaknesses, reliability risks, performance risks, architectural concerns that create current risk, data-integrity risks, testing defects, operational gaps, UX defects, documentation defects, and maintainability concerns.
 
@@ -18,8 +18,8 @@ Confidence: <Confirmed | High | Medium | Low | Hypothesis>
 Affected components: <components, packages, services, workflows, users, operators, data, or environments>
 
 Evidence:
-- `path/to/file.ext:line-line` — current explanation.
-- `path/to/other.ext:line-line` — current explanation.
+- `path/to/file.ext:line-line`: current explanation.
+- `path/to/other.ext:line-line`: current explanation.
 - <relevant command, test, schema, configuration, call path, timeline, or contradiction>.
 
 Current behavior:
@@ -67,10 +67,10 @@ Validation:
 <Regression-test level, static checks, reproductions, failure paths, migration checks, security checks, and operational verification.>
 
 Effort:
-<Small | Medium | Large | Program-level, with scope basis.>
+<Small | Medium | Large | Program-level, optionally followed by ": <scope basis>">
 
 Risk of the proposed change:
-<Low | Medium | High, with explanation and rollback controls.>
+<Low | Medium | High, optionally followed by ": <explanation and rollback controls>">
 
 Dependencies:
 <Prerequisite work, evidence, migration, ownership, telemetry, or coordination.>

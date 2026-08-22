@@ -6,16 +6,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
-import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+from workspace_hygiene import iter_project_paths, remove_generated
+
 REPO_ROOT = Path(__file__).resolve(strict=True).parents[1]
 SOURCE_ROOT = REPO_ROOT / "src" / "super-review"
-FORBIDDEN_PARTS = {"__pycache__", ".git", ".venv"}
 FORBIDDEN_SUFFIXES = {".pyc", ".pyo"}
 
 
@@ -27,13 +27,11 @@ def _run(command: list[str], cwd: Path = REPO_ROOT) -> None:
 
 
 def _remove_generated_bytecode() -> None:
-    """Remove Python cache files created by nested isolated test processes."""
-    for cache in sorted(REPO_ROOT.rglob("__pycache__"), reverse=True):
-        if cache.is_dir():
-            shutil.rmtree(cache)
-    for suffix in ("*.pyc", "*.pyo"):
-        for path in REPO_ROOT.rglob(suffix):
-            path.unlink(missing_ok=True)
+    remove_generated(
+        REPO_ROOT,
+        directory_names=("__pycache__",),
+        suffixes=(".pyc", ".pyo"),
+    )
 
 
 def _check_tree() -> None:
@@ -45,6 +43,7 @@ def _check_tree() -> None:
         REPO_ROOT / ".claude-plugin" / "marketplace.json",
         REPO_ROOT / ".cursor-plugin" / "plugin.json",
         REPO_ROOT / ".github" / "plugin" / "marketplace.json",
+        REPO_ROOT / "cli" / "LICENSE",
         REPO_ROOT / "src" / ".claude-plugin" / "plugin.json",
         REPO_ROOT / "src" / ".codex-plugin" / "plugin.json",
         REPO_ROOT / "src" / "client-adapters" / "commands" / "super-review.md",
@@ -54,12 +53,14 @@ def _check_tree() -> None:
         / "cursor"
         / "commands"
         / "super-review.md",
-        REPO_ROOT / "src" / "client-adapters" / "cursor" / "mcp.json",
         REPO_ROOT / "src" / "plugin.json",
+        REPO_ROOT / "src" / "LICENSE",
+        SOURCE_ROOT / "LICENSE",
         SOURCE_ROOT / "SKILL.md",
         SOURCE_ROOT / "agents" / "openai.yaml",
         SOURCE_ROOT / "scripts" / "validate_findings.py",
         SOURCE_ROOT / "scripts" / "commit_findings.py",
+        SOURCE_ROOT / "scripts" / "report_store.py",
         SOURCE_ROOT / "tests" / "run_tests.py",
     ]
     missing = [
@@ -68,10 +69,8 @@ def _check_tree() -> None:
     if missing:
         raise RuntimeError(f"missing required files: {missing}")
 
-    for path in REPO_ROOT.rglob("*"):
+    for path in iter_project_paths(REPO_ROOT):
         relative = path.relative_to(REPO_ROOT)
-        if any(part in FORBIDDEN_PARTS for part in relative.parts):
-            continue
         info = path.lstat()
         if stat.S_ISLNK(info.st_mode):
             raise RuntimeError(f"repository contains a symbolic link: {relative}")
@@ -80,9 +79,8 @@ def _check_tree() -> None:
 
 
 def _check_python_syntax() -> None:
-    for path in sorted(REPO_ROOT.rglob("*.py"), key=lambda item: item.as_posix()):
-        if any(part in FORBIDDEN_PARTS for part in path.relative_to(REPO_ROOT).parts):
-            continue
+    paths = (path for path in iter_project_paths(REPO_ROOT) if path.suffix == ".py")
+    for path in sorted(paths, key=lambda item: item.as_posix()):
         source = path.read_bytes()
         try:
             compile(source, str(path), "exec", dont_inherit=True)

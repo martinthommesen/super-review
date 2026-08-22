@@ -1,4 +1,4 @@
-# PHASE 15 — CONFIGURATION, INFRASTRUCTURE, AND DEPLOYMENT
+# Phase 15: configuration, infrastructure, and deployment
 
 Review:
 
@@ -50,5 +50,3 @@ Look for:
 - Production-only behavior that cannot be reproduced locally.
 - Configuration keys that are no longer used.
 - Multiple configuration mechanisms for the same behavior.
-
-===============================================================================

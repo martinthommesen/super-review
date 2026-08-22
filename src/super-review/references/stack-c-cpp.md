@@ -1,4 +1,4 @@
-# C and C++ Deep Checks
+# C and C++ deep checks
 
 Review applicable first-party C and C++ behavior for:
 

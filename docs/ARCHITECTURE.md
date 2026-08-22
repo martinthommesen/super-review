@@ -2,7 +2,7 @@
 
 ## System boundaries
 
-The workbench has two deliberately separate layers.
+The workbench separates shipped files from maintainer tooling.
 
 ### Shipped skill
 
@@ -23,23 +23,34 @@ The repository exposes four client-native marketplace/plugin catalogs without du
 - `.agents/plugins/marketplace.json` with `src/.codex-plugin/plugin.json` for Codex;
 - `.cursor-plugin/plugin.json` for Cursor (repo-root single-plugin manifest).
 
-Claude, Copilot, and Codex catalogs resolve `src/` as their plugin root. Claude and Copilot share a thin command adapter that loads `src/super-review/SKILL.md`; explicit-only activation is enforced by the skill description and invocation gate rather than client invocation-control frontmatter, which is not portable and blocks the Skill-tool path Claude Code uses even for user-typed commands. Codex resolves `src/super-review/` directly and uses its existing client policy metadata. Cursor's plugin root is the repository itself: it points `skills` at `./src/super-review`, ships a thin Cursor command under `src/client-adapters/cursor/commands/`, and registers the optional companion MCP from `src/client-adapters/cursor/mcp.json` using `${PLUGIN_ROOT}` so the companion binds to the installed skill copy. Marketplace namespaces may qualify the invocation name, but the loaded `SKILL.md`, references, helpers, tests, and review policy are the same bytes on every client.
+Claude, Copilot, and Codex resolve `src/` as their plugin root. Claude and
+Copilot share a command adapter that loads `src/super-review/SKILL.md`. The skill
+description and invocation gate enforce explicit activation. Client frontmatter
+cannot enforce this portably and blocks Claude Code's Skill-tool path even for a
+user-typed command.
+
+Codex resolves `src/super-review/` and uses `agents/openai.yaml`. Cursor uses the
+repository as its plugin root, points `skills` at `./src/super-review`, and adds
+the command under `src/client-adapters/cursor/commands/`. Cursor registers no MCP
+server. See D15. Every client loads the same skill files.
 
 ### Repository workbench
 
 Root `scripts/`, root `tests/`, docs, CI, build metadata, marketplace catalogs, and marketplace adapter manifests exist only for maintainers or repository-backed installation. They do not enter the portable direct-skill archive. That archive includes Codex's explicit-only policy and is suitable for other direct-install hosts only when they provide an equivalent invocation gate; Claude and Copilot use the marketplace adapters instead.
 
-### Optional MCP companion
+### Command-line interface
 
-`companion/` is an optional typed front-end over the shipped FINDINGS helpers. It is outside the portable ZIP and every marketplace payload (those still resolve from `src/` only). The companion has its own `pyproject.toml`, lockfile, and CI job so the MCP SDK never enters the stdlib-only skill or root `scripts/` trees. See decision D14: default to the skill-root CLI; use MCP only with host-attested active-server provenance plus user affirmation; always post-validate commits via the CLI; expose `commit_findings` only when the host gates writes to explicit skill invocation with a gate Auto-run/allowlist modes cannot skip. The bundled Cursor MCP entry therefore stays read-only.
+`cli/` packages the shipped FINDINGS helpers as a `super-review` command. It is
+outside the portable ZIP and marketplace skill payloads. Cursor installs the
+repository but wires only the canonical skill and command adapter.
 
-Helper APIs used by the companion:
-
-- `finding_fingerprint.compute_fingerprint`
-- `validate_findings.validate_bytes` and public `validate_findings.snapshot`
-- `commit_findings.commit_bytes` (path `commit()` reads the candidate once, then delegates here)
-
-MCP validate/commit tools transport UTF-8 text plus `content_sha256` of the encoded bytes, with a 1 MiB companion size bound and CLI fallback above it.
+The package has its own build metadata, lockfile, and CI job. Its runtime uses
+only the Python standard library. `skill_loaders.py` loads each helper from an
+explicit skill root after absolute-path, symlink, and escape checks. Subcommands
+use command-specific helper entry points and preserve their exit codes. `validate`
+cannot select snapshot or self-test modes. `snapshot` accepts a repository root,
+derives `<repo-root>/FINDINGS.md`, pins that directory before reading, and exposes
+only snapshot options. No server runs in the background.
 
 ## Instruction loading
 
@@ -54,15 +65,17 @@ A run follows this state model:
 1. Resolve canonical repository root and report path.
 2. Read exact existing report bytes and compute the starting digest, or record `MISSING`.
 3. Parse and revalidate every prior canonical record and derived claim.
-4. Independently review the current repository through phases 0–22.
+4. Independently review the current repository through phases 0 through 22.
 5. Canonicalize current records and preserve or retire IDs according to fingerprints.
 6. Generate a complete candidate outside the reviewed repository.
 7. Validate the candidate's exact bytes.
-8. Recheck the live target digest and protected human blocks.
-9. Stage the same validated bytes beside the target and atomically replace it.
+8. Pin the repository directory, then recheck the live target digest and
+   protected human blocks through that descriptor.
+9. Stage the same validated bytes in a pinned private directory and publish
+   through descriptors. Missing targets use atomic no-replace hard links.
+   Existing targets use one atomic exchange so the displaced inode remains
+   available for verification or conflict recovery.
 10. Reread and validate the committed report.
-
-A concurrent change causes a conflict, not a forced overwrite.
 
 ## Canonical record model
 
@@ -81,7 +94,25 @@ Summary tables, roadmap items, and cross-references point to canonical IDs inste
 
 The target repository is untrusted. Runtime helpers are invoked from the absolute loaded skill root with isolated Python mode. Sibling modules are loaded by canonical file path after regular-file and no-symlink checks. The reviewed repository's current working directory and import path are not trusted resolution sources.
 
-`commit_findings.py` exposes a single write core, `commit_bytes`, that validates and writes an immutable byte sequence under digest concurrency and annotation preservation. The path CLI reads the candidate once without following its final component, applies path-only location and hard-link checks, then delegates to `commit_bytes`. `validate_findings.snapshot` provides an exact-byte read of an existing report (or `MISSING`) for prior-report revalidation and concurrency bookkeeping; the snapshot digest is advisory because commit recomputes starting state.
+`commit_findings.py` exposes a single write core, `commit_bytes`, that validates an
+immutable byte sequence under digest concurrency and annotation preservation.
+`report_store.py` owns pinned directory identity, advisory locking, stable target
+reads, staging, publication, cleanup, directory sync, and final inode and byte
+verification. The path front end reads the candidate once without following its
+final component, applies location and hard-link checks, then delegates those
+captured bytes. Snapshot `--out` uses the same complete-stage and atomic-link
+publication path. Existing-report commits atomically exchange the staged and
+current names, then verify the displaced inode. A failed post-exchange check does
+not trigger another pathname exchange. The private directory is preserved as a
+recovery quarantine, avoiding a second source-name race. Platforms without the
+required descriptor-relative, no-replace, or exchange primitives fail before
+publication.
+`validate_findings.snapshot` provides an exact-byte read of an existing report,
+or `MISSING`, for prior-report revalidation and concurrency bookkeeping.
+
+Portable standard-library APIs cannot identify every privileged bind-mount alias
+to a repository subdirectory. Callers must not choose snapshot output through
+such an alias.
 
 ## Build model
 

@@ -1,15 +1,9 @@
-# EXHAUSTIVE WHOLE-CODEBASE, ARCHITECTURE, ENGINEERING, PRODUCT,
-# AND FEATURE-PORTFOLIO REVIEW
+# Whole-repository review mandate
 
-You are acting as an independent principal software engineer, software
-architect, security engineer, reliability engineer, performance engineer,
-database engineer, test architect, product-minded technical lead, UX reviewer,
-developer-experience specialist, and long-term maintainer.
-
-Your assignment is to perform an exhaustive, evidence-based review of the
-entire repository.
-
-This is not merely a bug hunt or style review.
+Perform an independent, evidence-based review of the entire repository. Cover
+engineering, architecture, security, reliability, performance, data, tests,
+product behavior, UX, developer experience, and long-term maintenance. This is
+broader than a bug hunt or style review.
 
 You must determine:
 
@@ -31,9 +25,7 @@ You must determine:
 Do not optimize for the number of findings. Optimize for correctness,
 materiality, evidence, actionable recommendations, and long-term value.
 
-===============================================================================
-PROJECT CONTEXT
-===============================================================================
+## Project context
 
 Repository or workspace:
 [REPOSITORY PATH OR URL]
@@ -104,9 +96,7 @@ When context is absent, infer it from repository evidence. Clearly distinguish:
 Do not invent product requirements, user behavior, usage metrics, business value,
 or operational constraints.
 
-===============================================================================
-REVIEW MODE AND CHANGE AUTHORIZATION
-===============================================================================
+## Review mode and change authorization
 
 Review mode:
 [CHOOSE ONE:
@@ -117,9 +107,7 @@ Review mode:
 
 Default to REVIEW ONLY when no mode is specified.
 
--------------------------------------------------------------------------------
-REVIEW ONLY
--------------------------------------------------------------------------------
+### Review only
 
 In REVIEW ONLY mode, the mandatory canonical root `FINDINGS.md` is the sole permitted repository modification. The following prohibitions apply to every other repository path:
 
@@ -144,9 +132,7 @@ You may run inspection and validation commands only after they pass the separate
 You may create temporary analysis artifacts outside the repository when needed,
 but remove them afterward or report them clearly.
 
--------------------------------------------------------------------------------
-REVIEW AND PROPOSE PATCHES
--------------------------------------------------------------------------------
+### Review and propose patches
 
 In REVIEW AND PROPOSE PATCHES mode:
 
@@ -159,9 +145,7 @@ In REVIEW AND PROPOSE PATCHES mode:
   compatibility contracts.
 - Do not propose broad rewrites where a focused change is sufficient.
 
--------------------------------------------------------------------------------
-REVIEW AND IMPLEMENT APPROVED FIXES
--------------------------------------------------------------------------------
+### Review and implement approved fixes
 
 In REVIEW AND IMPLEMENT APPROVED FIXES mode:
 
@@ -182,9 +166,7 @@ In REVIEW AND IMPLEMENT APPROVED FIXES mode:
 - Never weaken a valid test merely to make it pass.
 - Never suppress a legitimate error without addressing its cause.
 
--------------------------------------------------------------------------------
-REVIEW AND IMPLEMENT ALL HIGH-CONFIDENCE FIXES
--------------------------------------------------------------------------------
+### Review and implement all high-confidence fixes
 
 In REVIEW AND IMPLEMENT ALL HIGH-CONFIDENCE FIXES mode:
 
@@ -198,9 +180,7 @@ In REVIEW AND IMPLEMENT ALL HIGH-CONFIDENCE FIXES mode:
 
 In every mode, refresh the canonical `FINDINGS.md` from the post-validation, post-fix repository state. The detailed lifecycle, concurrency, and revalidation mechanics live only in `references/findings-lifecycle.md`.
 
-===============================================================================
-PRIMARY REVIEW OBJECTIVES
-===============================================================================
+## Primary review objectives
 
 Identify and evaluate:
 

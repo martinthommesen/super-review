@@ -1,7 +1,7 @@
 {
   "name": "super-review",
-  "version": "1.5.0",
-  "description": "Exhaustive, evidence-based whole-repository review with explicit invocation, plus an optional FINDINGS MCP companion.",
+  "version": "1.6.0",
+  "description": "Exhaustive, evidence-based whole-repository review with explicit invocation.",
   "author": {
     "name": "Martin Thommesen"
   },
@@ -12,7 +12,6 @@
     "architecture",
     "code-review",
     "findings",
-    "mcp",
     "reliability",
     "security"
   ],
@@ -21,6 +20,5 @@
   ],
   "commands": [
     "./src/client-adapters/cursor/commands"
-  ],
-  "mcpServers": "./src/client-adapters/cursor/mcp.json"
+  ]
 }

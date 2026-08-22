@@ -1,4 +1,4 @@
-# Python Deep Checks
+# Python deep checks
 
 Review applicable first-party Python and framework behavior for:
 
