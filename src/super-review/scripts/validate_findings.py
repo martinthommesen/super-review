@@ -125,12 +125,13 @@ FINGERPRINT_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 DIGEST_OR_MISSING_RE = re.compile(r"^(?:MISSING|sha256:[0-9a-f]{64})$")
 RECORD_HEADING_RE = re.compile(r"^## \[(?P<id>[A-Z]{2,5}-\d{3,})\] (?P<title>\S.*)$")
 SECTION_RE = re.compile(r"^# (?P<number>\d+)\. (?P<title>.+?)\s*$")
-HUMAN_START_RE = re.compile(
-    r'^<!-- SUPER-REVIEW:HUMAN-START id="(?P<id>[a-z0-9][a-z0-9._-]{0,63})" -->$'
+HUMAN_START_BYTES_RE = re.compile(
+    rb'^<!-- SUPER-REVIEW:HUMAN-START id="(?P<id>[a-z0-9][a-z0-9._-]{0,63})" -->$'
 )
-HUMAN_END_RE = re.compile(
-    r'^<!-- SUPER-REVIEW:HUMAN-END id="(?P<id>[a-z0-9][a-z0-9._-]{0,63})" -->$'
+HUMAN_END_BYTES_RE = re.compile(
+    rb'^<!-- SUPER-REVIEW:HUMAN-END id="(?P<id>[a-z0-9][a-z0-9._-]{0,63})" -->$'
 )
+FENCE_OPEN_BYTES_RE = re.compile(rb"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 FIELD_RE = re.compile(r"^(?P<label>[A-Za-z][A-Za-z0-9 /-]*):\s*(?P<value>.*)$")
 
 COMMON_FIELDS = {
@@ -418,16 +419,6 @@ FEATURE_DECISION_FIELDS = {
     },
     "Investigate": {"Evidence-gathering plan", "Decision threshold"},
 }
-ALL_FEATURE_SPECIFIC_FIELDS = set().union(*FEATURE_DECISION_FIELDS.values())
-ALL_KNOWN_FIELDS = (
-    DEFECT_FIELDS
-    | SECURITY_FIELDS
-    | IMPROVEMENT_FIELDS
-    | FEATURE_FIELDS
-    | POSITIVE_FIELDS
-    | OPTION_LOCAL_FIELDS
-    | ALL_FEATURE_SPECIFIC_FIELDS
-)
 ALLOWED_RETIRED_STATUSES = {"resolved", "superseded", "consolidated", "invalidated"}
 
 CLASSIFICATION_VALUES = {
@@ -484,7 +475,6 @@ REPORT_METADATA_LABELS = [
     "Material limitations",
 ]
 
-FENCE_OPEN_RE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
 ANGLE_TOKEN_RE = re.compile(r"<(?P<token>[^>\n]{1,240})>")
 BRACKET_PLACEHOLDER_RE = re.compile(
     r"\[(?:OPTIONAL|REQUIRED|CHOOSE ONE|INSERT|DESCRIBE|EXPLAIN|TODO|TBD)(?:[^\]]*)\]",
@@ -515,11 +505,23 @@ PLACEHOLDER_WORDS = {
 
 
 @dataclass(frozen=True)
-class HumanBlock:
+class ScannedBlock:
+    """One protected human block located by the canonical structure scanner."""
+
     block_id: str
     start_line: int
     end_line: int
-    raw: str
+    raw: bytes
+
+
+@dataclass(frozen=True)
+class StructureScan:
+    """Fence ranges, protected blocks, and structural errors for exact bytes."""
+
+    line_count: int
+    fence_ranges: list[tuple[int, int]]
+    blocks: list[ScannedBlock]
+    errors: list[str]
 
 
 @dataclass(frozen=True)
@@ -562,33 +564,115 @@ def _ranges_overlap(left: tuple[int, int], right: tuple[int, int]) -> bool:
     return left[0] <= right[1] and right[0] <= left[1]
 
 
-def _find_fenced_ranges(lines: list[str]) -> tuple[list[tuple[int, int]], list[str]]:
-    ranges: list[tuple[int, int]] = []
-    errors: list[str] = []
-    open_char: str | None = None
-    open_length = 0
-    open_line = 0
+def scan_report_structure(data: bytes) -> StructureScan:
+    """Scan exact report bytes with the single canonical structure grammar.
 
-    for index, line in enumerate(lines, start=1):
-        if open_char is None:
-            match = FENCE_OPEN_RE.fullmatch(line)
-            if match:
-                fence = match.group("fence")
-                open_char = fence[0]
-                open_length = len(fence)
-                open_line = index
+    Both the validator and the safe writer parse fences and protected human
+    blocks through this scanner, so a report can never be structurally valid to
+    one and invalid to the other. Lines split on LF / CRLF / CR exactly as
+    ``bytes.splitlines``. A fence opened in normal text neutralizes markers
+    inside it; an open human block is opaque, so fence-looking lines inside an
+    annotation are content, never structure. Backtick-fence info strings cannot
+    contain a backtick (CommonMark), and a closing fence permits only trailing
+    spaces and tabs. Errors are collected, not raised.
+    """
+    raw_lines = data.splitlines(keepends=True)
+    errors: list[str] = []
+    fence_ranges: list[tuple[int, int]] = []
+    blocks: list[ScannedBlock] = []
+    seen: set[str] = set()
+    open_id: str | None = None
+    open_line = 0
+    fence_close_re: re.Pattern[bytes] | None = None
+    fence_start = 0
+
+    for index, raw_line in enumerate(raw_lines, start=1):
+        line = raw_line.rstrip(b"\r\n")
+        if open_id is not None:
+            start = HUMAN_START_BYTES_RE.fullmatch(line)
+            end = HUMAN_END_BYTES_RE.fullmatch(line)
+            if start:
+                block_id = start.group("id").decode("ascii")
+                errors.append(
+                    _line_error(
+                        index, f"nested human block {block_id!r} inside {open_id!r}"
+                    )
+                )
+                continue
+            if end:
+                block_id = end.group("id").decode("ascii")
+                if block_id != open_id:
+                    errors.append(
+                        _line_error(
+                            index,
+                            f"human block end {block_id!r} does not match open block {open_id!r}",
+                        )
+                    )
+                    continue
+                blocks.append(
+                    ScannedBlock(
+                        open_id,
+                        open_line,
+                        index,
+                        b"".join(raw_lines[open_line - 1 : index]),
+                    )
+                )
+                open_id = None
+                open_line = 0
             continue
 
-        if re.fullmatch(rf" {{0,3}}{re.escape(open_char)}{{{open_length},}}\s*", line):
-            ranges.append((open_line, index))
-            open_char = None
-            open_length = 0
-            open_line = 0
+        if fence_close_re is not None:
+            if fence_close_re.fullmatch(line):
+                fence_ranges.append((fence_start, index))
+                fence_close_re = None
+                fence_start = 0
+            continue
 
-    if open_char is not None:
-        ranges.append((open_line, len(lines)))
-        errors.append(_line_error(open_line, "fenced code block is not closed"))
-    return ranges, errors
+        fence = FENCE_OPEN_BYTES_RE.fullmatch(line)
+        if fence:
+            marker = fence.group("marker")
+            info = fence.group("info")
+            if not (marker[:1] == b"`" and b"`" in info):
+                fence_close_re = re.compile(
+                    rb" {0,3}"
+                    + re.escape(marker[:1])
+                    + rb"{"
+                    + str(len(marker)).encode("ascii")
+                    + rb",}[ \t]*"
+                )
+                fence_start = index
+                continue
+
+        start = HUMAN_START_BYTES_RE.fullmatch(line)
+        end = HUMAN_END_BYTES_RE.fullmatch(line)
+        if start:
+            block_id = start.group("id").decode("ascii")
+            if block_id in seen:
+                errors.append(
+                    _line_error(index, f"duplicate human block id {block_id!r}")
+                )
+            seen.add(block_id)
+            open_id = block_id
+            open_line = index
+        elif end:
+            block_id = end.group("id").decode("ascii")
+            errors.append(
+                _line_error(index, f"human block end {block_id!r} has no start")
+            )
+
+    if open_id is not None:
+        errors.append(_line_error(open_line, f"human block {open_id!r} is not closed"))
+    if fence_close_re is not None:
+        fence_ranges.append((fence_start, len(raw_lines)))
+        errors.append(_line_error(fence_start, "fenced code block is not closed"))
+    return StructureScan(len(raw_lines), fence_ranges, blocks, errors)
+
+
+def _decoded_scan_lines(data: bytes) -> list[str]:
+    """Decode UTF-8 lines with exactly the scanner's byte segmentation."""
+    return [
+        line.rstrip(b"\r\n").decode("utf-8") for line in data.splitlines(keepends=True)
+    ]
 
 
 def _line_set(ranges: Iterable[tuple[int, int]]) -> set[int]:
@@ -598,71 +682,21 @@ def _line_set(ranges: Iterable[tuple[int, int]]) -> set[int]:
     return result
 
 
-def _find_human_blocks(
-    lines: list[str], ignored_lines: set[int]
-) -> tuple[list[HumanBlock], list[str]]:
-    blocks: list[HumanBlock] = []
-    errors: list[str] = []
-    open_id: str | None = None
-    open_line = 0
-    seen: set[str] = set()
-
-    for index, line in enumerate(lines, start=1):
-        if index in ignored_lines:
-            continue
-        start_match = HUMAN_START_RE.fullmatch(line)
-        end_match = HUMAN_END_RE.fullmatch(line)
-        if start_match:
-            block_id = start_match.group("id")
-            if open_id is not None:
-                errors.append(
-                    _line_error(
-                        index, f"nested human block {block_id!r} inside {open_id!r}"
-                    )
-                )
-                continue
-            if block_id in seen:
-                errors.append(
-                    _line_error(index, f"duplicate human block id {block_id!r}")
-                )
-            open_id = block_id
-            open_line = index
-            seen.add(block_id)
-        elif end_match:
-            block_id = end_match.group("id")
-            if open_id is None:
-                errors.append(
-                    _line_error(index, f"human block end {block_id!r} has no start")
-                )
-                continue
-            if block_id != open_id:
-                errors.append(
-                    _line_error(
-                        index,
-                        f"human block end {block_id!r} does not match open block {open_id!r}",
-                    )
-                )
-                continue
-            raw = "\n".join(lines[open_line - 1 : index])
-            blocks.append(HumanBlock(block_id, open_line, index, raw))
-            open_id = None
-            open_line = 0
-
-    if open_id is not None:
-        errors.append(_line_error(open_line, f"human block {open_id!r} is not closed"))
-    return blocks, errors
-
-
 def extract_human_blocks(text: str) -> dict[str, str]:
-    """Return protected blocks by ID, raising ValueError on malformed input."""
-    lines = text.splitlines()
-    fence_ranges, fence_errors = _find_fenced_ranges(lines)
-    if fence_errors:
-        raise ValueError("; ".join(fence_errors))
-    blocks, errors = _find_human_blocks(lines, _line_set(fence_ranges))
-    if errors:
-        raise ValueError("; ".join(errors))
-    return {block.block_id: block.raw for block in blocks}
+    """Return protected blocks by ID, raising ValueError on malformed input.
+
+    Values are newline-joined text reconstructions, not exact bytes; callers
+    that must preserve annotations byte for byte use the scanner's raw bytes.
+    """
+    data = text.encode("utf-8")
+    scan = scan_report_structure(data)
+    if scan.errors:
+        raise ValueError("; ".join(scan.errors))
+    lines = _decoded_scan_lines(data)
+    return {
+        block.block_id: "\n".join(lines[block.start_line - 1 : block.end_line])
+        for block in scan.blocks
+    }
 
 
 def _extract_registry(
@@ -763,6 +797,7 @@ def _validate_registry(
             max_numbers.get(prefix, 0), int(match.group("number"))
         )
 
+    retired_statuses: dict[str, str] = {}
     for record_id, entry in retired.items():
         match = ID_FULL_RE.fullmatch(record_id) if isinstance(record_id, str) else None
         if not match or match.group("prefix") not in ALL_PREFIXES:
@@ -801,6 +836,8 @@ def _validate_registry(
                 f"registry retired {record_id} status must be one of: "
                 f"{', '.join(sorted(ALLOWED_RETIRED_STATUSES))}"
             )
+        else:
+            retired_statuses[record_id] = status
         if not isinstance(replacements, list) or not all(
             isinstance(item, str) for item in replacements
         ):
@@ -830,6 +867,40 @@ def _validate_registry(
                 errors.append(
                     f"registry retired {record_id} references unknown replacement ID {replacement}"
                 )
+        status = retired_statuses.get(record_id)
+        if status in {"superseded", "consolidated"} and not replacements:
+            errors.append(
+                f"registry retired {record_id} status {status} requires at least one replacement ID"
+            )
+
+    # Replacement chains must terminate: peel retired entries whose chains end
+    # (in an active ID, or a retired entry with no further retired
+    # replacements). Together with the known-ID check above this guarantees
+    # every chain reaches an active or terminally retired identity, so the
+    # non-empty remainder is exactly the set of IDs forming or feeding a cycle.
+    chain_edges = {
+        record_id: {
+            replacement
+            for replacement in replacements
+            if replacement in retired_ids and replacement != record_id
+        }
+        for record_id, replacements in replacement_map.items()
+    }
+    while True:
+        terminal = [
+            record_id for record_id, targets in chain_edges.items() if not targets
+        ]
+        if not terminal:
+            break
+        for record_id in terminal:
+            del chain_edges[record_id]
+        for targets in chain_edges.values():
+            targets.difference_update(terminal)
+    if chain_edges:
+        errors.append(
+            "registry retired replacement_ids form a cycle involving: "
+            + ", ".join(sorted(chain_edges))
+        )
 
     for prefix, max_number in max_numbers.items():
         value = next_sequence.get(prefix)
@@ -1115,41 +1186,7 @@ def _placeholder_in_line(line: str) -> str | None:
 
 def _validate_option_sections(record: Record) -> list[str]:
     errors: list[str] = []
-    options = {
-        "### Option A — Keep and harden": {
-            "Minimal changes",
-            "Benefits",
-            "Costs",
-            "Risks",
-            "Expected lifetime",
-            "Correct-use conditions",
-        },
-        "### Option B — Incremental redesign": {
-            "Structural change",
-            "Benefits",
-            "Costs",
-            "Migration steps",
-            "Compatibility considerations",
-            "Testing requirements",
-            "Rollback strategy",
-        },
-        "### Option C — Alternative approach": {
-            "Alternative design",
-            "Benefits",
-            "Costs",
-            "New risks",
-            "Operational consequences",
-            "Team-skill implications",
-            "Dependency implications",
-            "Migration complexity",
-        },
-        "### Option D — Clean-slate ideal, when useful": {
-            "Ideal design",
-            "Incrementally useful parts",
-            "Parts not worth pursuing",
-            "Rewrite judgment",
-        },
-    }
+    options = OPTION_FIELDS
     structural_lines = record.structural_body.splitlines()
     content_lines = record.content_body.splitlines()
     positions: list[tuple[int, str]] = []
@@ -1305,6 +1342,24 @@ def _validate_records(
                     f"{record.record_id} missing required fields: {', '.join(sorted(missing_fields))}",
                 )
             )
+
+        # Every `Label: value` line in a record body must be a field this
+        # record type (and, for features, this decision) defines. Colon-led
+        # prose inside a field value parses as a field boundary, so it must be
+        # fenced, indented, or rephrased. Skipped for an invalid Decision,
+        # which already errored and leaves the allowed set undefined.
+        if record_type != "Feature decision" or decision in FEATURE_DECISIONS:
+            allowed_fields = set(required_fields)
+            if record_type == "Improvement or alternative":
+                allowed_fields |= OPTION_LOCAL_FIELDS
+            for label in sorted(set(record.field_occurrences) - allowed_fields):
+                errors.append(
+                    _line_error(
+                        record.field_occurrences[label][0].start_line,
+                        f"{record.record_id} has unknown field {label!r} for "
+                        f"record type {record_type!r}",
+                    )
+                )
 
         for label in sorted(required_fields & set(record.field_occurrences)):
             occurrences = record.field_occurrences[label]
@@ -1675,6 +1730,31 @@ def _validate_report_metadata(section_one: str) -> list[str]:
         errors.append(
             "Executive Summary Material limitations must explain a Partial or Blocked review"
         )
+
+    # Cross-field consistency, applied only when the involved values are
+    # individually well-formed so malformed values produce exactly one error.
+    revalidated_missing = "No — file did not exist"
+    revalidated_well_formed = (
+        revalidated == "Yes"
+        or revalidated == revalidated_missing
+        or revalidated.startswith("Partial — ")
+    )
+    if DIGEST_OR_MISSING_RE.fullmatch(starting_digest) and revalidated_well_formed:
+        if starting_digest == "MISSING" and revalidated != revalidated_missing:
+            errors.append(
+                "Executive Summary Existing report revalidated must be "
+                "'No — file did not exist' when Starting FINDINGS.md SHA-256 is MISSING"
+            )
+        if starting_digest != "MISSING" and revalidated == revalidated_missing:
+            errors.append(
+                "Executive Summary Starting FINDINGS.md SHA-256 must be MISSING "
+                "when Existing report revalidated is 'No — file did not exist'"
+            )
+        if completion == "Complete" and revalidated.startswith("Partial — "):
+            errors.append(
+                "Executive Summary Completion status must be Partial or Blocked "
+                "when Existing report revalidated is Partial"
+            )
     return errors
 
 
@@ -1686,13 +1766,17 @@ def validate_text(text: str) -> ValidationResult:
     if not text.endswith("\n"):
         warnings.append("report should end with a newline")
 
-    lines = text.splitlines()
-    fence_ranges, fence_errors = _find_fenced_ranges(lines)
-    errors.extend(fence_errors)
+    try:
+        data = text.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        return ValidationResult([f"report is not encodable as UTF-8: {exc}"], warnings)
+    scan = scan_report_structure(data)
+    errors.extend(scan.errors)
+    lines = _decoded_scan_lines(data)
+    fence_ranges = scan.fence_ranges
     fenced_lines = _line_set(fence_ranges)
 
-    human_blocks, human_errors = _find_human_blocks(lines, fenced_lines)
-    errors.extend(human_errors)
+    human_blocks = scan.blocks
     human_ranges = [(block.start_line, block.end_line) for block in human_blocks]
 
     registry_starts_in_human_blocks = [
@@ -1870,18 +1954,15 @@ def stated_canonical_root(text: str) -> str | None:
     through :func:`_summary_metadata_values`, so fenced examples and protected
     human annotations cannot spoof the repository identity.
     """
-    lines = text.splitlines()
-    fence_ranges, fence_errors = _find_fenced_ranges(lines)
-    if fence_errors:
-        return None
-    human_blocks, human_errors = _find_human_blocks(lines, _line_set(fence_ranges))
-    if human_errors:
+    data = text.encode("utf-8")
+    scan = scan_report_structure(data)
+    if scan.errors:
         return None
     structural = _masked_lines(
-        lines,
+        _decoded_scan_lines(data),
         [
-            *fence_ranges,
-            *((block.start_line, block.end_line) for block in human_blocks),
+            *scan.fence_ranges,
+            *((block.start_line, block.end_line) for block in scan.blocks),
         ],
     )
     section_ranges, section_errors = _parse_sections(structural)
@@ -2127,12 +2208,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="emit an exact-byte snapshot (digest and optional content) instead of validating",
     )
     parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="with --snapshot: omit report content from the output "
+        "(status, digest, size, and protected-block IDs only)",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="with --snapshot: write the exact report bytes to this new file "
+        "and keep the standard output metadata-only",
+    )
+    parser.add_argument(
         "--self-test", action="store_true", help="run built-in smoke tests"
     )
     return parser
 
 
-def _snapshot_payload(result: Snapshot) -> dict[str, object]:
+def _snapshot_payload(
+    result: Snapshot, *, include_content: bool = True
+) -> dict[str, object]:
     payload: dict[str, object] = {
         "status": result.status,
         "digest": result.digest,
@@ -2145,6 +2241,8 @@ def _snapshot_payload(result: Snapshot) -> dict[str, object]:
     if result.data is None:
         return payload
     payload["content_sha256"] = result.digest
+    if not include_content:
+        return payload
     try:
         payload["content"] = result.data.decode("utf-8")
     except UnicodeDecodeError:
@@ -2161,6 +2259,13 @@ def main(argv: list[str] | None = None) -> int:
         print("error: path is required unless --self-test is used", file=sys.stderr)
         return 2
 
+    if not args.snapshot and (args.metadata_only or args.out is not None):
+        print(
+            "error: --metadata-only and --out require --snapshot",
+            file=sys.stderr,
+        )
+        return 2
+
     if args.snapshot:
         if args.canonical_root is not None:
             print(
@@ -2173,7 +2278,20 @@ def main(argv: list[str] | None = None) -> int:
         except SnapshotError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
-        payload = _snapshot_payload(result)
+        if args.out is not None and result.data is not None:
+            try:
+                with open(args.out, "xb") as handle:
+                    handle.write(result.data)
+            except OSError as exc:
+                print(
+                    f"error: cannot write snapshot bytes to {args.out}: {exc}",
+                    file=sys.stderr,
+                )
+                return 1
+        include_content = not (args.metadata_only or args.out is not None)
+        payload = _snapshot_payload(result, include_content=include_content)
+        if args.out is not None:
+            payload["content_path"] = str(args.out) if result.data is not None else None
         if args.json:
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:
@@ -2184,6 +2302,8 @@ def main(argv: list[str] | None = None) -> int:
             assert isinstance(ids, list)
             if ids:
                 print("human_block_ids: " + ", ".join(str(item) for item in ids))
+            if payload.get("content_path"):
+                print(f"content_path: {payload['content_path']}")
         return 0
 
     result = validate_path(args.path, canonical_root=args.canonical_root)

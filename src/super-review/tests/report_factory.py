@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 
@@ -439,21 +440,42 @@ def make_positive(*, record_id: str = "POS-001") -> CanonicalRecord:
     return CanonicalRecord(record_id, record_type, fingerprint, 18, body)
 
 
+def make_retired_entry(
+    *,
+    status: str = "resolved",
+    replacement_ids: tuple[str, ...] = (),
+    seed: str = "retired-fixture",
+) -> dict:
+    """Return a well-formed retired-registry entry with a seed-unique fingerprint."""
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    return {
+        "fingerprint": f"sha256:{digest}",
+        "status": status,
+        "replacement_ids": list(replacement_ids),
+    }
+
+
 def build_report(
     records: list[CanonicalRecord] | None = None,
     *,
     canonical_root: str = DEFAULT_CANONICAL_ROOT,
+    retired: dict[str, dict] | None = None,
+    starting_digest: str = "MISSING",
+    revalidated: str = "No — file did not exist",
+    completion: str = "Complete",
+    material_limitations: str = "None",
 ) -> str:
     records = records or []
+    retired = retired or {}
     active = {record.record_id: record.fingerprint for record in records}
     next_sequence: dict[str, int] = {}
-    for record in records:
-        prefix, number = record.record_id.split("-", 1)
+    for record_id in [*active, *retired]:
+        prefix, number = record_id.split("-", 1)
         next_sequence[prefix] = max(next_sequence.get(prefix, 1), int(number) + 1)
     registry = {
         "schema_version": 2,
         "active": active,
-        "retired": {},
+        "retired": retired,
         "next_sequence": next_sequence,
     }
 
@@ -466,10 +488,10 @@ def build_report(
                 "Ending repository state: abc123 clean",
                 "Review time: 2026-07-22T12:00:00+02:00",
                 "Review mode: REVIEW ONLY",
-                "Starting FINDINGS.md SHA-256: MISSING",
-                "Existing report revalidated: No — file did not exist",
-                "Completion status: Complete",
-                "Material limitations: None",
+                f"Starting FINDINGS.md SHA-256: {starting_digest}",
+                f"Existing report revalidated: {revalidated}",
+                f"Completion status: {completion}",
+                f"Material limitations: {material_limitations}",
             ]
         )
     }

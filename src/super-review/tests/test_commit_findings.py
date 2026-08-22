@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import contextlib
+import errno
 import hashlib
 import os
+import random
 import tempfile
 import unittest
 from pathlib import Path
@@ -358,6 +360,105 @@ class CommitFindingsTests(unittest.TestCase):
                     lock_timeout=1.0,
                     dry_run=False,
                 )
+
+    def test_commit_works_without_os_fchmod(self) -> None:
+        """Windows before Python 3.13 lacks os.fchmod; chmod fallback must hold."""
+        expected_bytes = self.write_candidate()
+        with mock.patch.object(cf.os, "fchmod", None):
+            result = self.commit()
+        self.assertEqual(result["status"], "committed")
+        target = self.repo / "FINDINGS.md"
+        self.assertEqual(target.read_bytes(), expected_bytes)
+        self.assertEqual(os.stat(target).st_mode & 0o777, 0o644)
+
+    def test_missing_target_creation_without_hardlink_support(self) -> None:
+        expected_bytes = self.write_candidate()
+        with mock.patch.object(
+            cf.os, "link", side_effect=OSError(errno.EPERM, "hard links unsupported")
+        ):
+            result = self.commit()
+        self.assertEqual(result["status"], "committed")
+        target = self.repo / "FINDINGS.md"
+        self.assertEqual(target.read_bytes(), expected_bytes)
+        self.assertEqual(os.stat(target).st_mode & 0o777, 0o644)
+
+    def test_fallback_creation_detects_concurrent_writer(self) -> None:
+        self.write_candidate()
+        target = self.repo / "FINDINGS.md"
+        concurrent = rf.build_report().replace(
+            "Material limitations: None",
+            "Material limitations: Concurrent writer created this report.",
+            1,
+        )
+
+        def write_then_refuse(src, dst, *args, **kwargs):
+            target.write_text(concurrent, encoding="utf-8")
+            raise OSError(errno.EPERM, "hard links unsupported")
+
+        with mock.patch.object(cf.os, "link", side_effect=write_then_refuse):
+            with self.assertRaises(cf.ConflictError):
+                self.commit()
+        self.assertEqual(target.read_text(encoding="utf-8"), concurrent)
+
+    def test_commit_accepts_annotation_containing_fence_marker(self) -> None:
+        first = add_global_human_block(self.report(), "Decision.\n```\nrationale\n")
+        data = self.write_candidate(first)
+        self.commit()
+        target = self.repo / "FINDINGS.md"
+        self.assertEqual(target.read_bytes(), data)
+        second = first.replace(
+            "Material limitations: None", "Material limitations: None observed", 1
+        )
+        updated = self.write_candidate(second)
+        self.commit(expected=digest(data))
+        self.assertEqual(target.read_bytes(), updated)
+
+    def test_non_utf8_current_target_blocks_still_verified(self) -> None:
+        current = (
+            b"\xff\xfe binary prefix\n"
+            b'<!-- SUPER-REVIEW:HUMAN-START id="keep" -->\n'
+            b"payload\n"
+            b'<!-- SUPER-REVIEW:HUMAN-END id="keep" -->\n'
+        )
+        (self.repo / "FINDINGS.md").write_bytes(current)
+        self.write_candidate()
+        with self.assertRaisesRegex(cf.CommitError, "omits protected human block"):
+            self.commit(expected=digest(current))
+
+    def test_writer_and_validator_share_one_scanner(self) -> None:
+        """Differential guard: the writer must hold no structure parser of its own."""
+        self.assertFalse(hasattr(cf, "FENCE_OPEN_BYTES_RE"))
+        rng = random.Random(0)
+        atoms = [
+            b"```\n",
+            b"````\n",
+            b"~~~\n",
+            b"```python`x\n",
+            b"   ```\n",
+            b"``` \t\n",
+            b"```\xc2\xa0\n",
+            b"~~~ info\n",
+            b"plain prose\n",
+            b"text\xe2\x80\xa8more\n",
+            b'<!-- SUPER-REVIEW:HUMAN-START id="a" -->\n',
+            b'<!-- SUPER-REVIEW:HUMAN-END id="a" -->\n',
+            b'<!-- SUPER-REVIEW:HUMAN-START id="b" -->\n',
+            b'<!-- SUPER-REVIEW:HUMAN-END id="b" -->\n',
+            b'<!-- SUPER-REVIEW:HUMAN-END id="c" -->\n',
+            b"line\r\n",
+            b"line\r",
+            b"\n",
+        ]
+        validator = cf._VALIDATOR
+        for _ in range(300):
+            data = b"".join(rng.choice(atoms) for _ in range(rng.randrange(0, 12)))
+            scan = validator.scan_report_structure(data)
+            if scan.errors:
+                with self.assertRaises(cf.CommitError):
+                    cf._parse_human_blocks_bytes(data)
+            else:
+                expected = {block.block_id: block.raw for block in scan.blocks}
+                self.assertEqual(cf._parse_human_blocks_bytes(data), expected)
 
     def test_hard_linked_target_alone_is_not_refused(self) -> None:
         """Atomic replace may detach a hard-linked target pathname safely."""

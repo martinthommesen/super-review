@@ -58,13 +58,6 @@ EXIT_VALIDATION = 2
 EXIT_CONFLICT = 3
 EXIT_IO = 4
 
-HUMAN_START_BYTES_RE = re.compile(
-    rb'^<!-- SUPER-REVIEW:HUMAN-START id="([a-z0-9][a-z0-9._-]{0,63})" -->$'
-)
-HUMAN_END_BYTES_RE = re.compile(
-    rb'^<!-- SUPER-REVIEW:HUMAN-END id="([a-z0-9][a-z0-9._-]{0,63})" -->$'
-)
-FENCE_OPEN_BYTES_RE = re.compile(rb"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 DIGEST_RE = re.compile(r"^(?:sha256:)?([0-9a-fA-F]{64})$")
 
 
@@ -197,79 +190,16 @@ def _read_target(target: Path) -> tuple[str, bytes, os.stat_result | None]:
 
 
 def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
-    """Extract protected blocks byte-for-byte while ignoring fenced examples."""
-    lines = data.splitlines(keepends=True)
-    blocks: dict[str, bytes] = {}
-    open_id: str | None = None
-    start_index = 0
-    fence_char: bytes | None = None
-    fence_length = 0
-    fence_start = 0
+    """Extract protected blocks byte-for-byte via the canonical shared scanner.
 
-    for index, raw_line in enumerate(lines):
-        line = raw_line.rstrip(b"\r\n")
-        if open_id is not None:
-            start = HUMAN_START_BYTES_RE.fullmatch(line)
-            end = HUMAN_END_BYTES_RE.fullmatch(line)
-            if start:
-                block_id = start.group(1).decode("ascii")
-                raise CommitError(
-                    f"nested protected human block {block_id!r} inside {open_id!r}"
-                )
-            if end:
-                block_id = end.group(1).decode("ascii")
-                if block_id != open_id:
-                    raise CommitError(
-                        f"protected human block end {block_id!r} does not match open block {open_id!r}"
-                    )
-                blocks[block_id] = b"".join(lines[start_index : index + 1])
-                open_id = None
-                start_index = 0
-            continue
-
-        if fence_char is not None:
-            close_re = re.compile(
-                rb"^ {0,3}"
-                + re.escape(fence_char)
-                + rb"{"
-                + str(fence_length).encode("ascii")
-                + rb",}[ \t]*$"
-            )
-            if close_re.fullmatch(line):
-                fence_char = None
-                fence_length = 0
-                fence_start = 0
-            continue
-
-        fence = FENCE_OPEN_BYTES_RE.fullmatch(line)
-        if fence:
-            marker = fence.group("marker")
-            info = fence.group("info")
-            if not (marker[:1] == b"`" and b"`" in info):
-                fence_char = marker[:1]
-                fence_length = len(marker)
-                fence_start = index + 1
-                continue
-
-        start = HUMAN_START_BYTES_RE.fullmatch(line)
-        end = HUMAN_END_BYTES_RE.fullmatch(line)
-        if start:
-            block_id = start.group(1).decode("ascii")
-            if block_id in blocks:
-                raise CommitError(f"duplicate protected human block id {block_id!r}")
-            open_id = block_id
-            start_index = index
-        elif end:
-            block_id = end.group(1).decode("ascii")
-            raise CommitError(f"protected human block end {block_id!r} has no start")
-
-    if open_id is not None:
-        raise CommitError(f"protected human block {open_id!r} is not closed")
-    if fence_char is not None:
-        raise CommitError(
-            f"fenced code block beginning at line {fence_start} is not closed"
-        )
-    return blocks
+    The validator's ``scan_report_structure`` is the single structure grammar;
+    the writer holds no parser of its own, so bytes can never be structurally
+    valid to one program and invalid to the other.
+    """
+    scan = _VALIDATOR.scan_report_structure(data)
+    if scan.errors:
+        raise CommitError("; ".join(scan.errors))
+    return {block.block_id: block.raw for block in scan.blocks}
 
 
 def _verify_human_blocks(current: bytes, candidate: bytes) -> None:
@@ -370,13 +300,23 @@ class AdvisoryLock:
             self.handle = None
 
 
+def _set_mode(fd: int, path: Path, mode: int) -> None:
+    fchmod = getattr(os, "fchmod", None)
+    if fchmod is not None:
+        fchmod(fd, mode)
+    else:
+        # Windows before Python 3.13 lacks os.fchmod; the descriptor's path
+        # was just created by this process, so chmod by name is equivalent.
+        os.chmod(path, mode)
+
+
 def _write_temp(root: Path, candidate: bytes, mode: int | None) -> Path:
     fd, raw_path = tempfile.mkstemp(
         prefix=".FINDINGS.md.super-review.", suffix=".tmp", dir=root
     )
     temp_path = Path(raw_path)
     try:
-        os.fchmod(fd, stat.S_IMODE(mode if mode is not None else 0o644))
+        _set_mode(fd, temp_path, stat.S_IMODE(mode if mode is not None else 0o644))
         with os.fdopen(fd, "wb", closefd=True) as handle:
             handle.write(candidate)
             handle.flush()
@@ -488,21 +428,50 @@ def commit_bytes(
             _verify_human_blocks(final_bytes, candidate_bytes)
 
             if expected_digest == "MISSING":
-                try:
-                    os.link(temp_path, target, follow_symlinks=False)
-                except FileExistsError as exc:
-                    raise ConflictError(
-                        "FINDINGS.md appeared before creation; refusing to overwrite it"
-                    ) from exc
-                except (NotImplementedError, TypeError):
-                    # Platforms lacking follow_symlinks support still get an atomic
-                    # create-if-absent operation from link when the target is absent.
+                link = getattr(os, "link", None)
+                created_via_link = False
+                if link is not None:
                     try:
-                        os.link(temp_path, target)
+                        try:
+                            link(temp_path, target, follow_symlinks=False)
+                        except (NotImplementedError, TypeError):
+                            # Platforms lacking follow_symlinks support still
+                            # get an atomic create-if-absent from plain link.
+                            link(temp_path, target)
+                        created_via_link = True
                     except FileExistsError as exc:
                         raise ConflictError(
                             "FINDINGS.md appeared before creation; refusing to overwrite it"
                         ) from exc
+                    except OSError:
+                        # Filesystems without hard-link support (some SMB,
+                        # FUSE, and exFAT mounts) refuse link entirely; the
+                        # O_CREAT|O_EXCL create below is equally atomic.
+                        created_via_link = False
+                if not created_via_link:
+                    creation_flags = (
+                        os.O_WRONLY
+                        | os.O_CREAT
+                        | os.O_EXCL
+                        | getattr(os, "O_CLOEXEC", 0)
+                        | getattr(os, "O_BINARY", 0)
+                    )
+                    try:
+                        creation_fd = os.open(target, creation_flags, 0o644)
+                    except FileExistsError as exc:
+                        raise ConflictError(
+                            "FINDINGS.md appeared before creation; refusing to overwrite it"
+                        ) from exc
+                    try:
+                        _set_mode(creation_fd, target, 0o644)
+                        with os.fdopen(creation_fd, "wb", closefd=True) as handle:
+                            handle.write(candidate_bytes)
+                            handle.flush()
+                            os.fsync(handle.fileno())
+                    except BaseException:
+                        with contextlib.suppress(OSError):
+                            os.unlink(target)
+                        raise
                 temp_path.unlink()
             else:
                 os.replace(temp_path, target)

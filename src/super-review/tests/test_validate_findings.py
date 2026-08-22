@@ -134,6 +134,53 @@ Classification: Arbitrary
         result = vf.validate_text(report)
         self.assertTrue(result.ok, result.errors)
 
+    def test_backtick_info_fence_line_is_prose(self) -> None:
+        report = rf.build_report().replace(
+            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\n```python`x\nprose after the non-fence line.",
+            1,
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_fence_marker_inside_annotation_is_protected_content(self) -> None:
+        report = rf.add_global_human_block(
+            rf.build_report(), "Decision.\n```\nrationale\n"
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+        blocks = vf.extract_human_blocks(report)
+        self.assertIn("global-decisions", blocks)
+        self.assertIn("```", blocks["global-decisions"])
+
+    def test_exotic_line_separators_do_not_split_lines(self) -> None:
+        report = rf.build_report().replace(
+            "# 2. Repository and System Overview\n\nNo current canonical records supported — test fixture.",
+            "# 2. Repository and System Overview\n\nprose\x0b```",
+            1,
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_close_fence_allows_only_space_and_tab(self) -> None:
+        base = (
+            "# 2. Repository and System Overview\n\n"
+            "No current canonical records supported — test fixture."
+        )
+        good = rf.build_report().replace(
+            base,
+            "# 2. Repository and System Overview\n\n```text\nexample\n``` \t",
+            1,
+        )
+        result = vf.validate_text(good)
+        self.assertTrue(result.ok, result.errors)
+        bad = rf.build_report().replace(
+            base,
+            "# 2. Repository and System Overview\n\n```text\nexample\n```\u00a0",
+            1,
+        )
+        self.assert_invalid_with(bad, "fenced code block is not closed")
+
     def test_unclosed_fence_is_rejected(self) -> None:
         report = rf.build_report().replace(
             "# 18. Positive Patterns Worth Preserving",
@@ -433,6 +480,233 @@ Classification: Arbitrary
                 self.skipTest(f"symlinks unavailable: {exc}")
             with self.assertRaises(vf.SnapshotError):
                 vf.snapshot(link)
+
+    def test_unknown_field_on_defect_is_rejected(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Dependencies: None.",
+            "Dependencies: None.\n\nGuardrail indicators: Not a defect field.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Guardrail indicators' for record type"
+        )
+
+    def test_security_fields_are_unknown_outside_sec_records(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Dependencies: None.",
+            "Dependencies: None.\n\nThreat scenario: Only SEC records carry this.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Threat scenario' for record type"
+        )
+
+    def test_option_fields_are_unknown_outside_improvements(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Dependencies: None.",
+            "Dependencies: None.\n\nRewrite judgment: Options belong to improvements.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Rewrite judgment' for record type"
+        )
+
+    def test_other_decision_fields_are_unknown_on_feature(self) -> None:
+        report = rf.build_report([rf.make_feature()]).replace(
+            "Risks: Accidental weakening during unrelated refactors.",
+            "Risks: Accidental weakening during unrelated refactors.\n\n"
+            "Experiment hypothesis: Keep records do not carry experiment fields.",
+            1,
+        )
+        self.assert_invalid_with(
+            report, "has unknown field 'Experiment hypothesis' for record type"
+        )
+
+    def test_colon_led_prose_inside_value_is_rejected(self) -> None:
+        report = rf.build_report([rf.make_defect()]).replace(
+            "Minimal reproduction: Construct the invalid state and invoke the request handler.",
+            "Minimal reproduction:\nConstruct the invalid state.\n"
+            "Rollback: revert the commit afterwards.",
+            1,
+        )
+        self.assert_invalid_with(report, "has unknown field 'Rollback' for record type")
+
+    def test_registry_replacement_cycle_is_rejected(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-102",), seed="cycle-a"
+            ),
+            "COR-102": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-101",), seed="cycle-b"
+            ),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "form a cycle involving: COR-101, COR-102",
+        )
+
+    def test_registry_three_node_replacement_cycle_is_rejected(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-102",), seed="tri-a"
+            ),
+            "COR-102": rf.make_retired_entry(
+                status="consolidated", replacement_ids=("COR-103",), seed="tri-b"
+            ),
+            "COR-103": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-101",), seed="tri-c"
+            ),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "form a cycle involving: COR-101, COR-102, COR-103",
+        )
+
+    def test_registry_replacement_chain_to_resolved_is_valid(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-102",), seed="chain-a"
+            ),
+            "COR-102": rf.make_retired_entry(status="resolved", seed="chain-b"),
+        }
+        result = vf.validate_text(rf.build_report(retired=retired))
+        self.assertTrue(result.ok, result.errors)
+
+    def test_registry_replacement_into_active_is_valid(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="superseded", replacement_ids=("COR-002",), seed="into-active"
+            ),
+        }
+        report = rf.build_report([rf.make_defect(record_id="COR-002")], retired=retired)
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_registry_superseded_requires_replacement(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(status="superseded", seed="bare-super"),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "status superseded requires at least one replacement ID",
+        )
+
+    def test_registry_consolidated_requires_replacement(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(status="consolidated", seed="bare-consol"),
+        }
+        self.assert_invalid_with(
+            rf.build_report(retired=retired),
+            "status consolidated requires at least one replacement ID",
+        )
+
+    def test_registry_resolved_allows_informational_replacement(self) -> None:
+        retired = {
+            "COR-101": rf.make_retired_entry(
+                status="resolved", replacement_ids=("COR-102",), seed="resolved-ptr"
+            ),
+            "COR-102": rf.make_retired_entry(status="invalidated", seed="resolved-tgt"),
+        }
+        result = vf.validate_text(rf.build_report(retired=retired))
+        self.assertTrue(result.ok, result.errors)
+
+    def test_metadata_missing_start_rejects_revalidated_yes(self) -> None:
+        self.assert_invalid_with(
+            rf.build_report(revalidated="Yes"),
+            "must be 'No — file did not exist' when Starting FINDINGS.md SHA-256 is MISSING",
+        )
+
+    def test_metadata_existing_digest_rejects_file_did_not_exist(self) -> None:
+        self.assert_invalid_with(
+            rf.build_report(starting_digest="sha256:" + "a" * 64),
+            "Starting FINDINGS.md SHA-256 must be MISSING when Existing report "
+            "revalidated is 'No — file did not exist'",
+        )
+
+    def test_metadata_partial_revalidation_rejects_complete(self) -> None:
+        self.assert_invalid_with(
+            rf.build_report(
+                starting_digest="sha256:" + "a" * 64,
+                revalidated="Partial — only sections 6 through 8 were rechecked",
+            ),
+            "Completion status must be Partial or Blocked when Existing report "
+            "revalidated is Partial",
+        )
+
+    def test_metadata_partial_revalidation_with_partial_completion_is_valid(
+        self,
+    ) -> None:
+        report = rf.build_report(
+            starting_digest="sha256:" + "a" * 64,
+            revalidated="Partial — only sections 6 through 8 were rechecked",
+            completion="Partial",
+            material_limitations="Only sections 6 through 8 were revalidated.",
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_metadata_revalidated_yes_with_digest_is_valid(self) -> None:
+        report = rf.build_report(
+            starting_digest="sha256:" + "b" * 64, revalidated="Yes"
+        )
+        result = vf.validate_text(report)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_snapshot_cli_metadata_only_and_out(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "FINDINGS.md"
+            data = rf.build_report().replace("\n", "\r\n").encode("utf-8")
+            path.write_bytes(data)
+            out = Path(temp_dir) / "snapshot.bin"
+            stdout = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stdout(stdout):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+                self.assertEqual(code, 0)
+                stdout.seek(0)
+                payload = json.loads(stdout.read())
+            finally:
+                stdout.close()
+            self.assertIsNone(payload["content"])
+            self.assertIsNone(payload["content_base64"])
+            self.assertEqual(payload["content_path"], str(out))
+            self.assertTrue(str(payload["content_sha256"]).startswith("sha256:"))
+            self.assertEqual(out.read_bytes(), data)
+
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stderr(stderr):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1, "--out must refuse an existing file")
+
+            stdout = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stdout(stdout):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--metadata-only", str(path)]
+                    )
+                self.assertEqual(code, 0)
+                stdout.seek(0)
+                payload = json.loads(stdout.read())
+            finally:
+                stdout.close()
+            self.assertIsNone(payload["content"])
+            self.assertEqual(payload["size"], len(data))
+
+    def test_snapshot_flags_require_snapshot_mode(self) -> None:
+        stderr = tempfile.TemporaryFile(mode="w+")
+        try:
+            with contextlib.redirect_stderr(stderr):
+                code = vf.main(["--metadata-only", "irrelevant-path"])
+        finally:
+            stderr.close()
+        self.assertEqual(code, 2)
 
     def test_snapshot_cli_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
