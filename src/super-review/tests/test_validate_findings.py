@@ -730,6 +730,12 @@ Classification: Arbitrary
             outdir.mkdir()
             moved = base / "moved"
             out = outdir / "snapshot.bin"
+            probe = base / "symlink-probe"
+            try:
+                probe.symlink_to(repo)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"symlinks unavailable: {exc}")
+            probe.unlink()
 
             real_resolve = Path.resolve
             calls = {"outdir": 0}
@@ -767,7 +773,10 @@ Classification: Arbitrary
             path = repo / "FINDINGS.md"
             path.write_bytes(rf.build_report().encode("utf-8"))
             outdir = base / "outdir"
-            os.symlink(repo, outdir)
+            try:
+                outdir.symlink_to(repo)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"symlinks unavailable: {exc}")
             out = outdir / "copy.bin"
             stderr = tempfile.TemporaryFile(mode="w+")
             try:
