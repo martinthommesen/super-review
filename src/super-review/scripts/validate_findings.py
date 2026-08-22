@@ -2339,6 +2339,58 @@ def _snapshot_payload(
     return payload
 
 
+def _write_snapshot_bytes(out_path: Path, report_root: Path, data: bytes) -> str | None:
+    """Exclusively create ``out_path`` and write ``data``, refusing targets
+    inside ``report_root``. Returns an error message, or ``None`` on success.
+
+    The output directory is pinned by descriptor before the containment check
+    reruns against its resolved path, and the file is created relative to that
+    descriptor: a concurrent swap of a parent component for a symlink into the
+    reviewed repository cannot redirect the write after the check.
+    """
+    creation_flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_BINARY", 0)
+    )
+    if os.open in os.supports_dir_fd:
+        directory_flags = (
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+        )
+        dir_fd = os.open(out_path.parent, directory_flags)
+        try:
+            pinned = os.fstat(dir_fd)
+            resolved_parent = out_path.parent.resolve(strict=True)
+            checked = os.stat(resolved_parent)
+            if getattr(pinned, "st_ino", 0) and (
+                pinned.st_ino != checked.st_ino or pinned.st_dev != checked.st_dev
+            ):
+                return (
+                    f"output directory {out_path.parent} changed while writing; "
+                    "refusing"
+                )
+            if (resolved_parent / out_path.name).is_relative_to(report_root):
+                return f"--out must be outside the reviewed repository ({report_root})"
+            fd = os.open(out_path.name, creation_flags, 0o644, dir_fd=dir_fd)
+        finally:
+            os.close(dir_fd)
+    else:
+        # Windows lacks dir_fd support; the resolved-path pre-check is the
+        # best available guarantee there.
+        fd = os.open(out_path, creation_flags, 0o644)
+    try:
+        handle = os.fdopen(fd, "wb")
+    except BaseException:
+        os.close(fd)
+        raise
+    with handle:
+        handle.write(data)
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     """
     Run the FINDINGS report validator or execute the self-test command.
@@ -2396,13 +2448,11 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         if args.out is not None and result.data is not None:
             try:
-                with open(args.out, "xb") as handle:
-                    handle.write(result.data)
+                write_error = _write_snapshot_bytes(out_path, report_root, result.data)
             except OSError as exc:
-                print(
-                    f"error: cannot write snapshot bytes to {args.out}: {exc}",
-                    file=sys.stderr,
-                )
+                write_error = f"cannot write snapshot bytes to {args.out}: {exc}"
+            if write_error is not None:
+                print(f"error: {write_error}", file=sys.stderr)
                 return 1
         include_content = not (args.metadata_only or args.out is not None)
         payload = _snapshot_payload(result, include_content=include_content)

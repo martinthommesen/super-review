@@ -716,6 +716,98 @@ Classification: Arbitrary
             self.assertIn("outside the reviewed repository", message)
             self.assertFalse(inside.exists())
 
+    def test_snapshot_out_refuses_swapped_output_directory(self) -> None:
+        # Interleaved attack: the output directory is swapped for a symlink
+        # into the reviewed repository between the containment check and the
+        # write. The pinned-descriptor write must detect the swap and refuse.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            outdir = base / "outdir"
+            outdir.mkdir()
+            moved = base / "moved"
+            out = outdir / "snapshot.bin"
+
+            real_resolve = Path.resolve
+            calls = {"outdir": 0}
+
+            def swapping_resolve(target: Path, strict: bool = False) -> Path:
+                if target == outdir:
+                    calls["outdir"] += 1
+                    if calls["outdir"] == 2 and not outdir.is_symlink():
+                        os.rename(outdir, moved)
+                        os.symlink(repo, outdir)
+                return real_resolve(target, strict=strict)
+
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(Path, "resolve", swapping_resolve),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stderr.close()
+            self.assertEqual(code, 1, message)
+            self.assertIn("changed while writing", message)
+            self.assertFalse((repo / "snapshot.bin").exists())
+
+    def test_snapshot_out_symlinked_parent_into_repo_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            path.write_bytes(rf.build_report().encode("utf-8"))
+            outdir = base / "outdir"
+            os.symlink(repo, outdir)
+            out = outdir / "copy.bin"
+            stderr = tempfile.TemporaryFile(mode="w+")
+            try:
+                with contextlib.redirect_stderr(stderr):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+                stderr.seek(0)
+                message = stderr.read()
+            finally:
+                stderr.close()
+            self.assertEqual(code, 2, message)
+            self.assertIn("outside the reviewed repository", message)
+            self.assertFalse((repo / "copy.bin").exists())
+
+    def test_snapshot_out_without_dir_fd_support(self) -> None:
+        # Platforms without dir_fd (Windows) fall back to the pre-checked
+        # resolved path; the write itself must still work there.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            repo = base / "repo"
+            repo.mkdir()
+            path = repo / "FINDINGS.md"
+            data = rf.build_report().encode("utf-8")
+            path.write_bytes(data)
+            out = base / "snapshot.bin"
+            stdout = tempfile.TemporaryFile(mode="w+")
+            try:
+                with (
+                    mock.patch.object(vf.os, "supports_dir_fd", set()),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    code = vf.main(
+                        ["--snapshot", "--json", "--out", str(out), str(path)]
+                    )
+            finally:
+                stdout.close()
+            self.assertEqual(code, 0)
+            self.assertEqual(out.read_bytes(), data)
+
     def test_snapshot_flags_require_snapshot_mode(self) -> None:
         stderr = tempfile.TemporaryFile(mode="w+")
         try:
