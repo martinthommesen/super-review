@@ -7,8 +7,6 @@ import sys
 import unittest
 from pathlib import Path
 
-# The suite asserts the scripts tree stays free of bytecode; in-process helper
-# imports must not write any even when the runner is launched without -B.
 sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve(strict=True).parents[1]
