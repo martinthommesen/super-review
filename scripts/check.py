@@ -56,6 +56,8 @@ def _check_tree() -> None:
         / "super-review.md",
         REPO_ROOT / "src" / "client-adapters" / "cursor" / "mcp.json",
         REPO_ROOT / "src" / "plugin.json",
+        REPO_ROOT / "src" / "LICENSE",
+        SOURCE_ROOT / "LICENSE",
         SOURCE_ROOT / "SKILL.md",
         SOURCE_ROOT / "agents" / "openai.yaml",
         SOURCE_ROOT / "scripts" / "validate_findings.py",

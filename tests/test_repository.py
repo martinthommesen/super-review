@@ -392,11 +392,29 @@ class RepositoryTests(unittest.TestCase):
                 names = archive.namelist()
         self.assertTrue(names)
         self.assertTrue(all(name.startswith("super-review/") for name in names))
+        self.assertIn("super-review/LICENSE", names)
         self.assertFalse(
             any(name.startswith("super-review-skill-repo/") for name in names)
         )
         self.assertFalse(any("ORIGINAL_REVIEW_PROMPT" in name for name in names))
         self.assertFalse(any(name.endswith("AGENTS.md") for name in names))
+
+    def test_distributed_license_copies_match_root_license(self) -> None:
+        # Apache-2.0 section 4 requires recipients to receive the license text,
+        # so every distributable payload carries a byte-identical copy.
+        root_license = (ROOT / "LICENSE").read_bytes()
+        self.assertIn(b"Apache License", root_license)
+        for relative in ("src/LICENSE", "src/super-review/LICENSE"):
+            self.assertEqual((ROOT / relative).read_bytes(), root_license, relative)
+
+    def test_archive_license_bytes_match_root_license(self) -> None:
+        build = load_module("_workbench_build_license", ROOT / "scripts" / "build.py")
+        with tempfile.TemporaryDirectory() as directory:
+            artifact = Path(directory) / "super-review-skill.zip"
+            build.build(artifact)
+            with zipfile.ZipFile(artifact) as archive:
+                archived = archive.read("super-review/LICENSE")
+        self.assertEqual(archived, (ROOT / "LICENSE").read_bytes())
 
     def test_ci_actions_are_commit_pinned(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
