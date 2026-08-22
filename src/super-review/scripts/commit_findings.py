@@ -198,15 +198,19 @@ def _read_target(target: Path) -> tuple[str, bytes, os.stat_result | None]:
 def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
     """
     Extract protected report blocks while preserving their original bytes.
-    
+
+    The validator's ``scan_report_structure`` is the single canonical structure
+    grammar; the writer holds no parser of its own, so bytes can never be
+    structurally valid to one program and invalid to the other.
+
     Parameters:
-    	data (bytes): Report content to scan.
-    
+        data (bytes): Report content to scan.
+
     Returns:
-    	dict[str, bytes]: Mapping of block identifiers to their original byte content.
-    
+        dict[str, bytes]: Mapping of block identifiers to their original byte content.
+
     Raises:
-    	CommitError: If the report structure is invalid.
+        CommitError: If the report structure is invalid.
     """
     scan = _VALIDATOR.scan_report_structure(data)
     if scan.errors:
@@ -217,11 +221,11 @@ def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
 def _verify_human_blocks(current: bytes, candidate: bytes) -> None:
     """
     Verify that protected human-authored blocks are present and unchanged in the candidate content.
-    
+
     Parameters:
         current (bytes): Existing file content containing the protected blocks.
         candidate (bytes): Proposed file content to validate against the existing blocks.
-    
+
     Raises:
         CommitError: If a protected block is missing from or changed in the candidate content.
     """
@@ -338,13 +342,13 @@ def _set_mode(fd: int, path: Path, mode: int) -> None:
 def _write_temp(root: Path, candidate: bytes, mode: int | None) -> Path:
     """
     Write candidate content to a durable temporary file in the repository.
-    
+
     Parameters:
         root (Path): Directory in which to create the temporary file.
         candidate (bytes): Content to write.
         mode (int | None): File permission bits to apply, or ``None`` to use
             default permissions.
-    
+
     Returns:
         Path: Path to the temporary file.
     """
@@ -392,7 +396,7 @@ def commit_bytes(
 ) -> dict[str, str]:
     """
     Validate candidate report bytes and atomically commit them to the repository's findings file.
-    
+
     Parameters:
         repo_root (Path): Repository root containing ``FINDINGS.md``.
         candidate_bytes (bytes): Complete report content to validate and commit.
@@ -401,10 +405,10 @@ def commit_bytes(
         dry_run (bool): Whether to validate without writing the candidate.
         source (str): Source label used in validation errors.
         candidate_stat (os.stat_result | None): Optional candidate metadata used to detect hard links to the target.
-    
+
     Returns:
         dict[str, str]: Commit path, digests, and status metadata.
-    
+
     Raises:
         CommitError: If validation, repository checks, or post-commit verification fails.
         ConflictError: If the findings file changes or appears contrary to the expected digest.

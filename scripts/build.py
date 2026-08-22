@@ -48,10 +48,10 @@ def _iter_source_files() -> list[Path]:
 def _zip_info(path: Path) -> zipfile.ZipInfo:
     """
     Create normalized ZIP metadata for a source file.
-    
+
     Parameters:
         path (Path): Source file to represent in the archive.
-    
+
     Returns:
         zipfile.ZipInfo: Archive entry metadata with a fixed timestamp, UTF-8
             filename, deflate compression, and normalized file permissions.

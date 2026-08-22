@@ -69,16 +69,16 @@ def _run(command: list[str], cwd: Path) -> None:
 def verify(artifact: Path, *, run_tests: bool = True) -> str:
     """
     Validate a release archive against the source tree and optionally run its extracted tests.
-    
+
     Parameters:
-    	artifact (Path): Path to the release archive.
-    	run_tests (bool): Whether to run the extracted test suite and findings validator.
-    
+        artifact (Path): Path to the release archive.
+        run_tests (bool): Whether to run the extracted test suite and findings validator.
+
     Returns:
-    	str: The artifact's SHA-256 hexadecimal digest.
-    
+        str: The artifact's SHA-256 hexadecimal digest.
+
     Raises:
-    	RuntimeError: If the artifact is invalid, differs from the source tree, fails extraction checks or tests, or has an unrecognized checksum.
+        RuntimeError: If the artifact is invalid, differs from the source tree, fails extraction checks or tests, or has an unrecognized checksum.
     """
     artifact = artifact.expanduser().resolve(strict=True)
     artifact_info = artifact.lstat()
