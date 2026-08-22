@@ -520,21 +520,27 @@ def commit_bytes(
                         raise ConflictError(
                             "FINDINGS.md appeared before creation; refusing to overwrite it"
                         ) from exc
+                    placeholder_info = None
                     try:
-                        _set_mode(placeholder_fd, target, 0o644)
-                        placeholder_info = os.fstat(placeholder_fd)
-                    finally:
-                        os.close(placeholder_fd)
-                    try:
+                        try:
+                            placeholder_info = os.fstat(placeholder_fd)
+                            _set_mode(placeholder_fd, target, 0o644)
+                        finally:
+                            os.close(placeholder_fd)
                         os.replace(temp_path, target)
                     except BaseException:
-                        # Best-effort cleanup: remove the placeholder only
-                        # while the path still is our placeholder; never
-                        # delete a file another writer put there meanwhile.
-                        with contextlib.suppress(OSError):
-                            current_info = os.lstat(target)
-                            if _same_identity(placeholder_info, current_info):
-                                os.unlink(target)
+                        # One cleanup handler covers placeholder setup and the
+                        # replace itself: remove the path only while it still
+                        # is our placeholder; never delete a file another
+                        # writer put there meanwhile. Identity is captured
+                        # before any failable setup step so a mode failure
+                        # cannot orphan the empty placeholder; if identity was
+                        # never captured, the path is left alone.
+                        if placeholder_info is not None:
+                            with contextlib.suppress(OSError):
+                                current_info = os.lstat(target)
+                                if _same_identity(placeholder_info, current_info):
+                                    os.unlink(target)
                         raise
                 else:
                     temp_path.unlink()

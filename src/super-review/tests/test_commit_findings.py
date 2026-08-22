@@ -401,6 +401,33 @@ class CommitFindingsTests(unittest.TestCase):
         # partially written candidate.
         self.assertFalse(target.exists())
 
+    def test_fallback_setup_failure_leaves_no_placeholder(self) -> None:
+        self.write_candidate()
+        target = self.repo / "FINDINGS.md"
+        real_set_mode = cf._set_mode
+
+        def failing_set_mode(fd: int, path, mode: int) -> None:
+            # Fail only the placeholder's mode step; _write_temp still works.
+            if path.name == "FINDINGS.md":
+                raise OSError(errno.EPERM, "chmod refused")
+            real_set_mode(fd, path, mode)
+
+        with (
+            mock.patch.object(
+                cf.os,
+                "link",
+                side_effect=OSError(errno.EPERM, "hard links unsupported"),
+            ),
+            mock.patch.object(cf, "_set_mode", side_effect=failing_set_mode),
+        ):
+            with self.assertRaises(OSError):
+                self.commit()
+        # A failure between placeholder creation and replacement must not
+        # orphan an empty FINDINGS.md that wedges later creation commits.
+        self.assertFalse(target.exists())
+        result = self.commit()
+        self.assertEqual(result["status"], "committed")
+
     def test_fallback_cleanup_spares_foreign_replacement(self) -> None:
         self.write_candidate()
         target = self.repo / "FINDINGS.md"
