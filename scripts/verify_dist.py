@@ -146,7 +146,6 @@ def verify(artifact: Path, *, run_tests: bool = True) -> str:
                     [
                         sys.executable,
                         "-I",
-                        "-B",
                         str(extracted_skill / "tests" / "run_tests.py"),
                     ],
                     extracted_skill,
