@@ -131,6 +131,24 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("cannot resolve skill root", err)
 
+    def test_scripts_directory_resolution_oserror_maps_to_exit_2(self) -> None:
+        # The blanket mock above trips on the first resolve (the skill root);
+        # this one fails only the scripts-directory resolution so the later
+        # wrapper is exercised too.
+        real_resolve = Path.resolve
+
+        def failing_resolve(target: Path, strict: bool = False) -> Path:
+            if target.name == "scripts":
+                raise OSError("transport endpoint disconnected")
+            return real_resolve(target, strict=strict)
+
+        with mock.patch.object(Path, "resolve", failing_resolve):
+            code, _, err = run_cli(
+                "--skill-root", str(SKILL_ROOT), "validate", "irrelevant"
+            )
+        self.assertEqual(code, 2)
+        self.assertIn("cannot resolve skill scripts directory", err)
+
     def test_validate_round_trip(self) -> None:
         candidate = self.write_candidate()
         code, out, _ = with_root("validate", str(candidate))

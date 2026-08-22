@@ -74,7 +74,7 @@ Publishing is intentionally outside repository automation. Push the verified mar
 
 ## 9. Tag the release
 
-This step is an explicit operator action, like step 8: nothing in `scripts/` or the Makefile creates or pushes tags. After the release commit is on the default branch, create an immutable annotated tag so marketplace consumers can pin exact revisions (for example Codex `--ref`):
+This step is an explicit operator action, like step 8: nothing in `scripts/` or the Makefile creates or pushes tags. After the release commit is on the default branch, create an annotated tag so marketplace consumers can pin revisions (for example Codex `--ref`). A tag is only as immutable as the remote makes it: protect `v*` tags against updates and deletion (on GitHub, a tag ruleset), and record the tagged commit SHA in the release notes so consumers can pin the exact revision even where tag protection is not in place:
 
 ```bash
 git tag -a vX.Y.Z -m "super-review X.Y.Z"
