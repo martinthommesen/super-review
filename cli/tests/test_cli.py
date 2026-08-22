@@ -28,6 +28,15 @@ from super_review_cli.skill_loaders import SkillLoadError, load_helper  # noqa: 
 
 
 def run_cli(*argv: str) -> tuple[int, str, str]:
+    """
+    Execute the CLI with captured standard output and error streams.
+    
+    Parameters:
+    	argv (str): Command-line arguments passed to the CLI.
+    
+    Returns:
+    	tuple[int, str, str]: The exit code, captured standard output, and captured standard error.
+    """
     stdout = io.StringIO()
     stderr = io.StringIO()
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
@@ -36,6 +45,14 @@ def run_cli(*argv: str) -> tuple[int, str, str]:
 
 
 def with_root(*argv: str) -> tuple[int, str, str]:
+    """Run the CLI with the configured absolute skill root.
+    
+    Parameters:
+    	argv (str): Command-line arguments passed to the CLI.
+    
+    Returns:
+    	tuple[int, str, str]: The exit code, standard output, and standard error.
+    """
     return run_cli("--skill-root", str(SKILL_ROOT), *argv)
 
 
@@ -63,6 +80,15 @@ class CliTests(unittest.TestCase):
         self.temp.cleanup()
 
     def write_candidate(self, text: str | None = None) -> Path:
+        """
+        Write a candidate report to the test repository.
+        
+        Parameters:
+        	text (str | None): Report content to write. If omitted, builds a report for the repository.
+        
+        Returns:
+        	Path: The path to the written candidate report.
+        """
         candidate = self.base / "candidate.md"
         candidate.write_text(
             text

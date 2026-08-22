@@ -392,6 +392,12 @@ class CommitFindingsTests(unittest.TestCase):
         )
 
         def write_then_refuse(src, dst, *args, **kwargs):
+            """
+            Write concurrent content to the target and raise a permission error to simulate unsupported hard links.
+            
+            Raises:
+                OSError: Always raised with errno.EPERM.
+            """
             target.write_text(concurrent, encoding="utf-8")
             raise OSError(errno.EPERM, "hard links unsupported")
 

@@ -52,6 +52,7 @@ options:
 
 
 def _print_help(stream: TextIO) -> None:
+    """Write the command-line usage and command help text to a stream."""
     stream.write(_HELP)
 
 
@@ -70,6 +71,15 @@ def _snapshot_target(repo_root: Path) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """
+    Dispatch a super-review command to its helper module.
+    
+    Parameters:
+    	argv (list[str] | None): Command-line arguments without the program name. If omitted, uses the process arguments.
+    
+    Returns:
+    	int: The helper's exit code, or `2` for invalid arguments, missing configuration, or helper-loading errors.
+    """
     arguments = list(sys.argv[1:] if argv is None else argv)
 
     skill_root: Path | None = None

@@ -397,6 +397,15 @@ def make_feature(
 
 
 def make_positive(*, record_id: str = "POS-001") -> CanonicalRecord:
+    """
+    Create a positive-pattern record for centralized domain authorization.
+    
+    Parameters:
+    	record_id (str): Identifier assigned to the record.
+    
+    Returns:
+    	CanonicalRecord: A section-18 record describing the authorization pattern.
+    """
     category = "POS"
     record_type = "Positive pattern"
     component = "security/authorization"
@@ -465,6 +474,21 @@ def build_report(
     completion: str = "Complete",
     material_limitations: str = "None",
 ) -> str:
+    """
+    Build a canonical report containing registry data, review metadata, and numbered sections.
+    
+    Parameters:
+    	records (list[CanonicalRecord] | None): Records to include in the report.
+    	canonical_root (str): Root path used in review metadata.
+    	retired (dict[str, dict] | None): Retired registry entries to include.
+    	starting_digest (str): SHA-256 digest recorded for the starting report state.
+    	revalidated (str): Status of existing report revalidation.
+    	completion (str): Review completion status.
+    	material_limitations (str): Material limitations recorded for the review.
+    
+    Returns:
+    	str: The rendered canonical report with a trailing newline.
+    """
     records = records or []
     retired = retired or {}
     active = {record.record_id: record.fingerprint for record in records}

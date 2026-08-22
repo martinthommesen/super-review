@@ -196,11 +196,17 @@ def _read_target(target: Path) -> tuple[str, bytes, os.stat_result | None]:
 
 
 def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
-    """Extract protected blocks byte-for-byte via the canonical shared scanner.
-
-    The validator's ``scan_report_structure`` is the single structure grammar;
-    the writer holds no parser of its own, so bytes can never be structurally
-    valid to one program and invalid to the other.
+    """
+    Extract protected report blocks while preserving their original bytes.
+    
+    Parameters:
+    	data (bytes): Report content to scan.
+    
+    Returns:
+    	dict[str, bytes]: Mapping of block identifiers to their original byte content.
+    
+    Raises:
+    	CommitError: If the report structure is invalid.
     """
     scan = _VALIDATOR.scan_report_structure(data)
     if scan.errors:
@@ -209,6 +215,16 @@ def _parse_human_blocks_bytes(data: bytes) -> dict[str, bytes]:
 
 
 def _verify_human_blocks(current: bytes, candidate: bytes) -> None:
+    """
+    Verify that protected human-authored blocks are present and unchanged in the candidate content.
+    
+    Parameters:
+        current (bytes): Existing file content containing the protected blocks.
+        candidate (bytes): Proposed file content to validate against the existing blocks.
+    
+    Raises:
+        CommitError: If a protected block is missing from or changed in the candidate content.
+    """
     current_blocks = _parse_human_blocks_bytes(current)
     candidate_blocks = _parse_human_blocks_bytes(candidate)
     for block_id, raw in current_blocks.items():
@@ -307,6 +323,9 @@ class AdvisoryLock:
 
 
 def _set_mode(fd: int, path: Path, mode: int) -> None:
+    """
+    Apply the specified permission mode to an open file.
+    """
     fchmod = getattr(os, "fchmod", None)
     if fchmod is not None:
         fchmod(fd, mode)
@@ -317,6 +336,18 @@ def _set_mode(fd: int, path: Path, mode: int) -> None:
 
 
 def _write_temp(root: Path, candidate: bytes, mode: int | None) -> Path:
+    """
+    Write candidate content to a durable temporary file in the repository.
+    
+    Parameters:
+        root (Path): Directory in which to create the temporary file.
+        candidate (bytes): Content to write.
+        mode (int | None): File permission bits to apply, or ``None`` to use
+            default permissions.
+    
+    Returns:
+        Path: Path to the temporary file.
+    """
     fd, raw_path = tempfile.mkstemp(
         prefix=".FINDINGS.md.super-review.", suffix=".tmp", dir=root
     )
@@ -359,11 +390,24 @@ def commit_bytes(
     source: str = "<bytes>",
     candidate_stat: os.stat_result | None = None,
 ) -> dict[str, str]:
-    """Validate and commit immutable candidate bytes under digest concurrency.
-
-    This is the single write core. Path-based ``commit()`` reads the candidate
-    once without following its final component, then delegates here. Optional
-    ``candidate_stat`` enables the path-only hard-link-to-target refusal.
+    """
+    Validate candidate report bytes and atomically commit them to the repository's findings file.
+    
+    Parameters:
+        repo_root (Path): Repository root containing ``FINDINGS.md``.
+        candidate_bytes (bytes): Complete report content to validate and commit.
+        expected_digest (str): Digest expected for the current findings file, or ``"MISSING"``.
+        lock_timeout (float): Maximum time to wait for the repository lock.
+        dry_run (bool): Whether to validate without writing the candidate.
+        source (str): Source label used in validation errors.
+        candidate_stat (os.stat_result | None): Optional candidate metadata used to detect hard links to the target.
+    
+    Returns:
+        dict[str, str]: Commit path, digests, and status metadata.
+    
+    Raises:
+        CommitError: If validation, repository checks, or post-commit verification fails.
+        ConflictError: If the findings file changes or appears contrary to the expected digest.
     """
     if len(candidate_bytes) > MAX_REPORT_BYTES:
         raise CommitError(f"{source} exceeds {MAX_REPORT_BYTES} byte safety limit")
