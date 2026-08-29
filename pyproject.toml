@@ -1,6 +1,6 @@
 [project]
 name = "super-review-skill-workbench"
-version = "1.6.0"
+version = "1.6.1"
 description = "Development, validation, and deterministic release workbench for the super-review Agent Skill"
 license = "Apache-2.0"
 license-files = ["LICENSE"]

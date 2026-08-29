@@ -14,6 +14,10 @@ from unittest import mock
 import commit_findings as cf
 import report_factory as rf
 
+# Pin a symlink-resolved temp root (the default macOS TMPDIR is a symlink)
+# so stated canonical roots match resolved review destinations.
+tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
+
 
 def digest(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
@@ -641,6 +645,22 @@ class CommitFindingsTests(unittest.TestCase):
                 self.commit(expected=digest(current))
         self.assertEqual(target.read_bytes(), current)
         self.assertEqual(list(self.repo.glob(".FINDINGS.md.super-review.*.stage")), [])
+
+    def test_exchange_uses_darwin_swap_flag_when_renameat2_is_absent(self) -> None:
+        exchange = mock.Mock(return_value=0)
+        # A bare Mock would auto-create renameat2 and skip the Darwin branch.
+        libc = mock.Mock(spec=["renameatx_np"], renameatx_np=exchange)
+        with mock.patch.object(cf._REPORT_STORE.ctypes, "CDLL", return_value=libc):
+            cf._REPORT_STORE._rename_exchange(3, "a", 4, "b")
+        exchange.assert_called_once()
+        flags = exchange.call_args.args[-1]
+        self.assertEqual(flags, cf._REPORT_STORE._RENAME_SWAP)
+        self.assertNotEqual(flags, 0)
+
+    def test_exchange_fails_closed_when_no_exchange_symbol_exists(self) -> None:
+        with mock.patch.object(cf._REPORT_STORE.ctypes, "CDLL", return_value=object()):
+            with self.assertRaises(cf._REPORT_STORE.SafePublicationUnavailable):
+                cf._REPORT_STORE._rename_exchange(3, "a", 4, "b")
 
     def test_existing_target_mode_is_preserved(self) -> None:
         current = self.report().encode("utf-8")

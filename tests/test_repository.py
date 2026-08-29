@@ -14,6 +14,10 @@ from pathlib import Path
 from types import ModuleType
 from unittest import mock
 
+# Pin a symlink-resolved temp root (the default macOS TMPDIR is a symlink)
+# so temporary paths compare as physical paths.
+tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
+
 ROOT = Path(__file__).resolve(strict=True).parents[1]
 SKILL = ROOT / "src" / "super-review"
 

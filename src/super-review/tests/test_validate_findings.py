@@ -11,6 +11,10 @@ from unittest import mock
 import report_factory as rf
 import validate_findings as vf
 
+# Pin a symlink-resolved temp root (the default macOS TMPDIR is a symlink)
+# so stated canonical roots match resolved review destinations.
+tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
+
 
 class ValidateFindingsTests(unittest.TestCase):
     def assert_invalid_with(self, report: str, fragment: str) -> None:
