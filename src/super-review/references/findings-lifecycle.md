@@ -244,8 +244,8 @@ is a thin front on `commit_bytes`, the single policy entry point.
 
 The canonical-root check prevents a report generated for one repository from
 being written to another. This can happen when concurrent reviews share a
-candidate path. Give each candidate the target's absolute `Canonical root` and
-use a distinct out-of-repository path for each target.
+candidate path. Give each candidate the target's absolute, symlink-resolved
+`Canonical root` and use a distinct out-of-repository path for each target.
 
 The digest check and advisory lock serialize writers that use the helper. Atomic
 exchange also preserves the displaced inode during the final publication window.

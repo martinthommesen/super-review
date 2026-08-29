@@ -7,6 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+# Pin a symlink-resolved temp root (the default macOS TMPDIR is a symlink)
+# so temporary paths compare as physical paths.
+tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
+
 ROOT = Path(__file__).resolve().parents[1]
 
 

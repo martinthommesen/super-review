@@ -128,7 +128,10 @@ _PRIVATE_DIRECTORY_OPERATIONS_AVAILABLE = all(
     operation in os.supports_dir_fd for operation in (os.mkdir, os.rmdir)
 )
 
+# Linux RENAME_EXCHANGE and Darwin RENAME_SWAP coincide at 2 by accident.
+# Never pass flags=0: both platforms then perform a plain replacing rename.
 _RENAME_EXCHANGE = 2
+_RENAME_SWAP = 0x00000002
 
 
 def _rename_exchange(
@@ -139,25 +142,29 @@ def _rename_exchange(
 ) -> None:
     """Atomically exchange two descriptor-relative names or fail closed."""
     try:
-        renameat2 = ctypes.CDLL(None, use_errno=True).renameat2
+        libc = ctypes.CDLL(None, use_errno=True)
+        try:
+            exchange, flags = libc.renameat2, _RENAME_EXCHANGE
+        except AttributeError:
+            exchange, flags = libc.renameatx_np, _RENAME_SWAP
     except (AttributeError, OSError) as exc:
         raise SafePublicationUnavailable(
             "atomic existing-target exchange is unavailable on this platform"
         ) from exc
-    renameat2.argtypes = (
+    exchange.argtypes = (
         ctypes.c_int,
         ctypes.c_char_p,
         ctypes.c_int,
         ctypes.c_char_p,
         ctypes.c_uint,
     )
-    renameat2.restype = ctypes.c_int
-    result = renameat2(
+    exchange.restype = ctypes.c_int
+    result = exchange(
         source_fd,
         os.fsencode(_validate_leaf_name(source)),
         destination_fd,
         os.fsencode(_validate_leaf_name(destination)),
-        _RENAME_EXCHANGE,
+        flags,
     )
     if result == 0:
         return

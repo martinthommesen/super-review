@@ -5,7 +5,7 @@ description: Performs an exhaustive, evidence-based whole-repository engineering
 
 # Super Review
 
-Version: 1.6.0
+Version: 1.6.1
 
 Compatibility: Requires filesystem access to the target repository or directory and permission to create or update its root `FINDINGS.md`. Git and code-search tools are recommended. Python 3 is recommended for the bundled fingerprint, report-validation, safe-write, and test scripts.
 
@@ -21,7 +21,7 @@ $super-review:super-review [repository path or directory] [optional review mode 
 /super-review:super-review [repository path or directory] [optional review mode and context]
 ```
 
-Use the supplied target. If none is supplied, use the current repository or workspace. Resolve the canonical root to an absolute path from the version-control root when available; otherwise use the absolute supplied directory root.
+Use the supplied target. If none is supplied, use the current repository or workspace. Resolve the canonical root to an absolute, symlink-resolved path from the version-control root when available; otherwise use the absolute, symlink-resolved supplied directory root.
 
 ## Trusted skill root
 
