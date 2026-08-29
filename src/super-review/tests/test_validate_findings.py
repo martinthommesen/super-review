@@ -18,13 +18,6 @@ tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
 
 class ValidateFindingsTests(unittest.TestCase):
     def assert_invalid_with(self, report: str, fragment: str) -> None:
-        """
-        Validate that a report is rejected and that its errors contain the expected fragment.
-        
-        Parameters:
-        	report (str): Report text to validate.
-        	fragment (str): Error message fragment expected in the validation errors.
-        """
         result = vf.validate_text(report)
         self.assertFalse(result.ok, result.errors)
         self.assertTrue(

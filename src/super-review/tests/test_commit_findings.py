@@ -20,15 +20,6 @@ tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
 
 
 def digest(data: bytes) -> str:
-    """
-    Compute a SHA-256 digest for byte data.
-    
-    Parameters:
-    	data (bytes): The data to hash.
-    
-    Returns:
-    	str: The digest prefixed with ``sha256:``.
-    """
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
@@ -661,10 +652,9 @@ class CommitFindingsTests(unittest.TestCase):
         libc = mock.Mock(spec=["renameatx_np"], renameatx_np=exchange)
         with mock.patch.object(cf._REPORT_STORE.ctypes, "CDLL", return_value=libc):
             cf._REPORT_STORE._rename_exchange(3, "a", 4, "b")
-        exchange.assert_called_once()
-        flags = exchange.call_args.args[-1]
-        self.assertEqual(flags, cf._REPORT_STORE._RENAME_SWAP)
-        self.assertNotEqual(flags, 0)
+        exchange.assert_called_once_with(
+            3, b"a", 4, b"b", cf._REPORT_STORE._RENAME_SWAP
+        )
 
     def test_exchange_fails_closed_when_no_exchange_symbol_exists(self) -> None:
         with mock.patch.object(cf._REPORT_STORE.ctypes, "CDLL", return_value=object()):
