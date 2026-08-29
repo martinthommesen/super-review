@@ -10,7 +10,7 @@ maintains one canonical report:
 ```
 
 It works with Claude Code, GitHub Copilot CLI, Codex, Cursor, and other Agent
-Skills hosts. The current skill version is **1.6.0**.
+Skills hosts. The current skill version is **1.6.1**.
 
 ## What it does
 

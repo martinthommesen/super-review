@@ -2,6 +2,29 @@
 
 All notable changes to `super-review` are recorded here.
 
+## [1.6.1] (2026-08-29)
+
+### Fixed
+
+- The safe writer can refresh an existing `FINDINGS.md` on macOS. The
+  atomic exchange now probes `renameat2` first and then Darwin's
+  `renameatx_np` with `RENAME_SWAP`. The descriptor-relative
+  security model and the fail-closed guard are unchanged. Filesystems
+  without an atomic swap, such as HFS+ and ExFAT, still fail closed with
+  no partial write. Regression tests pin the Darwin symbol selection and
+  the nonzero swap flag. (#26)
+
+### Changed
+
+- `SKILL.md`, `references/final-report.md`, and
+  `references/findings-lifecycle.md` state that `Canonical root` must be
+  the physical, symlink-resolved path. On macOS, a stated `/tmp` or
+  `/var` path does not match the resolved `/private` destination and is
+  rejected.
+- CI runs the offline pipeline on macOS as well as Ubuntu. Every test
+  suite pins a symlink-resolved temporary root, so the suites pass
+  under the symlinked default macOS `TMPDIR`.
+
 ## [1.6.0] (2026-08-22)
 
 ### Added

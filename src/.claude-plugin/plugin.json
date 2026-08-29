@@ -1,6 +1,6 @@
 {
   "name": "super-review",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Exhaustive, evidence-based whole-repository review with explicit invocation.",
   "author": {
     "name": "Martin Thommesen"

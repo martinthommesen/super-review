@@ -13,7 +13,7 @@ Do not add filler.
 Begin with these exact metadata labels and current values:
 
 ```text
-Canonical root: <absolute canonical root, including any workspace-resolved root>
+Canonical root: <absolute symlink-resolved canonical root, including any workspace-resolved root>
 Reviewed branch and revision: <branch and revision, or Not available: reason>
 Starting repository state: <revision and worktree/directory fingerprint>
 Ending repository state: <revision and worktree/directory fingerprint>
@@ -24,6 +24,8 @@ Existing report revalidated: <Yes | No — file did not exist | Partial — limi
 Completion status: <Complete | Partial | Blocked>
 Material limitations: <specific limitations or None>
 ```
+
+`Canonical root` must be the physical, symlink-resolved path, such as the output of `git rev-parse --show-toplevel`. The validator compares it against the resolved review destination and rejects a path that still contains symlinked components (for example macOS `/tmp` or `/var`, which resolve under `/private`).
 
 These values are cross-checked: `MISSING` pairs exactly with `Existing report revalidated: No — file did not exist` (in both directions); `Completion status: Complete` requires `Existing report revalidated` to be `Yes` or `No — file did not exist`; and `Material limitations: None` is rejected when the completion status is `Partial` or `Blocked`.
 
