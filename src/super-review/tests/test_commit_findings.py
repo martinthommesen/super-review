@@ -20,6 +20,15 @@ tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
 
 
 def digest(data: bytes) -> str:
+    """
+    Compute a SHA-256 digest for byte data.
+    
+    Parameters:
+    	data (bytes): The data to hash.
+    
+    Returns:
+    	str: The digest prefixed with ``sha256:``.
+    """
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
