@@ -3,7 +3,7 @@
 # [dependency-groups].dev in pyproject.toml via `uv sync --dev`.
 # Runtime scripts in the skill remain Python-standard-library-only.
 # Pins must match [dependency-groups].dev in pyproject.toml.
-coverage==7.15.4
+coverage==7.16.0
 pre-commit==4.6.2
 ruff==0.16.4
 skills-ref==0.1.1
